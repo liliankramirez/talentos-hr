@@ -23,7 +23,7 @@
   label.f, fieldset { display: block; border: 0; padding: 0; margin: 0; min-width: 0; }
   .lab, legend { display: block; font-weight: 600; font-size: 15px; margin-bottom: 6px; padding: 0; color: var(--ink); }
   .hint { display: block; font-size: 13px; color: var(--soft); margin: -2px 0 6px; font-weight: 400; }
-  input[type=text], input[type=tel], select, textarea { width: 100%; font: inherit; color: var(--ink); background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 48px; appearance: none; -webkit-appearance: none; }
+  input[type=text], input[type=tel], input[type=email], select, textarea { width: 100%; font: inherit; color: var(--ink); background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 48px; appearance: none; -webkit-appearance: none; }
   select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px; }
   textarea { min-height: 88px; resize: vertical; }
   input:focus, select:focus, textarea:focus { outline: 3px solid #c7d2fe; outline-offset: 0; border-color: var(--pri); }
@@ -83,6 +83,8 @@
 
   function renderForm() {
     document.title = 'Registro · ' + conv.titulo;
+    /* El correo solo se pide si el texto de autorización lo incluye entre los datos que se recogen. */
+    var askMail = /correo electr[oó]nico/i.test(conv.aviso);
     var exp = ['No tengo experiencia en este cargo', 'Menos de 6 meses', 'Entre 6 meses y 1 año', 'Más de 1 año'];
     var disp = ['Turno de día', 'Turno de noche', 'Fines de semana y festivos', 'Puedo empezar de inmediato'];
     var src = ['WhatsApp', 'Facebook u otra red social', 'Me refirió un trabajador', 'Aviso o volante', 'Portal de empleo', 'Otro medio'];
@@ -94,6 +96,7 @@
         '<div id="top"></div>' +
         '<label class="f"><span class="lab">Nombre completo</span><input type="text" name="nombre" autocomplete="name" maxlength="120" required></label>' +
         '<label class="f"><span class="lab">Celular</span><span class="hint">El que usa en WhatsApp. Son 10 números y empieza por 3.</span><input type="tel" name="celular" inputmode="numeric" autocomplete="tel" maxlength="20" placeholder="3001234567" required></label>' +
+        (askMail ? '<label class="f"><span class="lab">Correo electrónico</span><span class="hint">Opcional. Si no tiene correo, deje este espacio en blanco.</span><input type="email" name="correo" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="160"></label>' : '') +
         '<label class="f"><span class="lab">Barrio o localidad donde vive</span><input type="text" name="zona" maxlength="120" required></label>' +
         '<label class="f"><span class="lab">Experiencia en este cargo o en uno parecido</span><select name="exp" required><option value="">Elija una opción</option>' + exp.map(function (o) { return '<option>' + o + '</option>'; }).join('') + '</select></label>' +
         '<label class="f"><span class="lab">Cuéntenos dónde trabajó y qué hacía</span><span class="hint">Opcional. Unas pocas líneas bastan.</span><textarea name="expdet" maxlength="400"></textarea></label>' +
@@ -119,10 +122,12 @@
     Array.prototype.forEach.call(f.querySelectorAll('.bad'), function (x) { x.classList.remove('bad'); });
     document.getElementById('top').innerHTML = ''; document.getElementById('e-disp').innerHTML = ''; document.getElementById('e-aut').innerHTML = '';
     var cel = v('celular').replace(/\D/g, ''); if (cel.length === 12 && cel.indexOf('57') === 0) cel = cel.slice(2);
+    var mail = f.elements.correo ? v('correo').toLowerCase() : '';
     var disp = Array.prototype.filter.call(f.querySelectorAll('[name=disp]'), function (x) { return x.checked; }).map(function (x) { return x.value; });
     var first = null, bad = function (el, msg) { mark(el, msg); first = first || el; };
     if (v('nombre').length < 5 || v('nombre').indexOf(' ') < 0) bad(f.elements.nombre, 'Escriba su nombre y apellido.');
     if (!/^3[0-9]{9}$/.test(cel)) bad(f.elements.celular, cel.length && cel.length !== 10 ? 'El celular debe tener 10 números y usted escribió ' + cel.length + '. Revíselo, por favor.' : 'Escriba su celular de 10 números, empezando por 3. Ejemplo: 3001234567.');
+    if (mail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) bad(f.elements.correo, 'Revise el correo. Debe ser como nombre@ejemplo.com. Si no tiene, déjelo en blanco.');
     if (v('zona').length < 3) bad(f.elements.zona, 'Escriba el barrio o la localidad.');
     if (!v('exp')) bad(f.elements.exp, 'Elija una opción.');
     if (!disp.length) { document.getElementById('e-disp').innerHTML = '<span class="fielderr">Marque al menos una opción.</span>'; first = first || f.querySelector('[name=disp]'); }
@@ -131,7 +136,14 @@
     if (first) { first.focus(); first.scrollIntoView({ block: 'center' }); return; }
     if (v('sitio')) { done(); return; } // campo trampa: lo llenan los programas automáticos, no las personas
     var btn = f.querySelector('button.go'); sending = true; btn.disabled = true; btn.textContent = 'Enviando…';
-    api('talentos_postulaciones', { body: { convocatoria_id: conv.id, nombre: v('nombre').slice(0, 120), celular: cel, zona: v('zona'), experiencia: (v('exp') + (v('expdet') ? ' · ' + v('expdet') : '')).slice(0, 600), disponibilidad: disp.join(', ').slice(0, 200), fuente: v('fuente'), autoriza: true, aviso_version: hash(conv.aviso) } })
+    var row = { convocatoria_id: conv.id, nombre: v('nombre').slice(0, 120), celular: cel, zona: v('zona'), experiencia: (v('exp') + (v('expdet') ? ' · ' + v('expdet') : '')).slice(0, 600), disponibilidad: disp.join(', ').slice(0, 200), fuente: v('fuente'), autoriza: true, aviso_version: hash(conv.aviso) };
+    if (mail) row.correo = mail;
+    api('talentos_postulaciones', { body: row })
+      .catch(function (err) {
+        /* Si la base aún no tiene el campo de correo, el registro se guarda sin él en lugar de perderse. */
+        if (row.correo && !(err && err.network) && /correo|PGRST204|42703|42501/i.test(String(err && err.message || ''))) { delete row.correo; return api('talentos_postulaciones', { body: row }); }
+        throw err;
+      })
       .then(done, function (err) {
         sending = false; btn.disabled = false; btn.textContent = 'Enviar mi registro';
         var t = String(err && err.message || '');

@@ -1,5 +1,6 @@
--- TalentOS HR · Autorregistro de candidatos (versión 1.3)
--- Se ejecuta UNA sola vez en Supabase → SQL Editor. Puede ejecutarse de nuevo sin dañar nada.
+-- TalentOS HR · Autorregistro de candidatos (versión 1.4)
+-- Se ejecuta en Supabase → SQL Editor. Puede ejecutarse de nuevo sin dañar nada ni borrar registros:
+-- si ya lo ejecutó en la versión 1.3, vuelva a ejecutarlo para agregar el campo de correo.
 --
 -- Qué crea:
 --   1. talentos_convocatorias: lo que el candidato ve al abrir el enlace (cargo, responsable de los datos,
@@ -52,6 +53,7 @@ create table if not exists public.talentos_postulaciones (
   user_id         uuid        references auth.users (id) on delete cascade,
   nombre          text        not null check (char_length(nombre) between 3 and 120),
   celular         text        not null check (celular ~ '^[0-9+ ]{7,20}$'),
+  correo          text        not null default '',
   zona            text        not null default '' check (char_length(zona) <= 120),
   experiencia     text        not null default '' check (char_length(experiencia) <= 600),
   disponibilidad  text        not null default '' check (char_length(disponibilidad) <= 200),
@@ -60,6 +62,12 @@ create table if not exists public.talentos_postulaciones (
   aviso_version   text        not null default '' check (char_length(aviso_version) <= 40),
   created_at      timestamptz not null default now()
 );
+
+-- Campo de correo (opcional para el candidato). Estas líneas lo agregan si la tabla ya existía.
+alter table public.talentos_postulaciones add column if not exists correo text not null default '';
+alter table public.talentos_postulaciones drop constraint if exists talentos_postulaciones_correo_valido;
+alter table public.talentos_postulaciones add constraint talentos_postulaciones_correo_valido
+  check (correo = '' or (char_length(correo) <= 160 and correo ~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$'));
 
 create index if not exists talentos_postulaciones_user_idx on public.talentos_postulaciones (user_id, created_at desc);
 create index if not exists talentos_postulaciones_conv_idx on public.talentos_postulaciones (convocatoria_id);
@@ -106,7 +114,7 @@ create policy "post_duena_lee"       on public.talentos_postulaciones for select
 create policy "post_duena_borra"     on public.talentos_postulaciones for delete to authenticated using (auth.uid() = user_id);
 
 revoke all on public.talentos_postulaciones from anon, authenticated;
-grant insert (convocatoria_id, nombre, celular, zona, experiencia, disponibilidad, fuente, autoriza, aviso_version) on public.talentos_postulaciones to anon;
+grant insert (convocatoria_id, nombre, celular, correo, zona, experiencia, disponibilidad, fuente, autoriza, aviso_version) on public.talentos_postulaciones to anon;
 grant select, delete on public.talentos_postulaciones to authenticated;
 
 revoke all on function public.talentos_postulacion_antes() from public, anon, authenticated;
