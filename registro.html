@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#4f46e5">
+<title>Registro de candidatos</title>
+<style>
+  :root { --ink: #0f172a; --mut: #475569; --soft: #64748b; --line: #dbe1ea; --bg: #f5f7fb; --card: #ffffff; --pri: #4f46e5; --pri-d: #4338ca; --ok: #047857; --ok-bg: #ecfdf5; --err: #b91c1c; --err-bg: #fef2f2; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 20px 16px calc(40px + env(safe-area-inset-bottom)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px 20px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 12px 28px -18px rgba(15, 23, 42, .18); }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--pri); background: #eef2ff; border-radius: 999px; padding: 4px 10px; }
+  h1 { font-size: 24px; line-height: 1.2; margin: 12px 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 17px; margin: 0 0 4px; }
+  p { margin: 0 0 12px; color: var(--mut); }
+  .detail { white-space: pre-line; }
+  .resp { font-size: 13px; color: var(--soft); margin: 0; }
+  form { margin-top: 18px; display: grid; gap: 18px; }
+  label.f, fieldset { display: block; border: 0; padding: 0; margin: 0; min-width: 0; }
+  .lab, legend { display: block; font-weight: 600; font-size: 15px; margin-bottom: 6px; padding: 0; color: var(--ink); }
+  .hint { display: block; font-size: 13px; color: var(--soft); margin: -2px 0 6px; font-weight: 400; }
+  input[type=text], input[type=tel], select, textarea { width: 100%; font: inherit; color: var(--ink); background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 48px; appearance: none; -webkit-appearance: none; }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px; }
+  textarea { min-height: 88px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 3px solid #c7d2fe; outline-offset: 0; border-color: var(--pri); }
+  .opt { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; margin-bottom: 8px; cursor: pointer; }
+  .opt input { width: 22px; height: 22px; margin: 1px 0 0; flex: none; accent-color: var(--pri); }
+  .opt span { font-size: 15px; color: var(--ink); }
+  .opt:has(input:checked) { border-color: var(--pri); background: #f5f6ff; }
+  .consent { background: #f8fafc; border: 1.5px solid var(--line); border-radius: 14px; padding: 14px; }
+  .consent .opt { margin: 0; border: 0; padding: 0; background: transparent; }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: var(--pri-d); font-weight: 600; font-size: 14px; padding: 6px 0; }
+  .aviso { white-space: pre-line; font-size: 13.5px; color: var(--mut); margin: 6px 0 0; max-height: 46vh; overflow: auto; padding-right: 4px; }
+  button.go { width: 100%; min-height: 54px; border: 0; border-radius: 14px; background: var(--pri); color: #fff; font: inherit; font-weight: 700; font-size: 17px; cursor: pointer; }
+  button.go:hover { background: var(--pri-d); }
+  button.go[disabled] { opacity: .6; cursor: default; }
+  .msg { border-radius: 12px; padding: 12px 14px; font-size: 14.5px; }
+  .msg.err { background: var(--err-bg); color: var(--err); border: 1px solid #fecaca; }
+  .msg.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid #a7f3d0; }
+  .fielderr { color: var(--err); font-size: 13px; margin-top: 4px; display: block; }
+  .bad { border-color: #f87171 !important; }
+  .center { text-align: center; padding: 34px 20px; }
+  .big { width: 64px; height: 64px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--ok-bg); color: var(--ok); font-size: 32px; margin-bottom: 8px; }
+  .big.gray { background: #f1f5f9; color: var(--soft); }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .foot { text-align: center; font-size: 12px; color: var(--soft); margin-top: 16px; }
+  .spin { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: var(--pri); border-radius: 50%; animation: s 0.8s linear infinite; display: inline-block; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
+</style>
+</head>
+<body>
+<main id="app" aria-live="polite"><div class="card center"><span class="spin" role="status" aria-label="Cargando"></span><p style="margin-top:12px">Cargando el formulario…</p></div></main>
+<script>
+(function () {
+  'use strict';
+  /* Mismo proyecto y misma clave pública que usa TalentOS HR. La clave pública solo permite leer convocatorias
+     activas y enviar un registro; no permite leer, cambiar ni borrar postulaciones. */
+  var SUPABASE_URL = 'https://ztujvajarzkrbwinjauo.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_PPJG8CS05pDcuCgK9Gvtiw_uGnhb40H';
+  var app = document.getElementById('app');
+  var conv = null, sending = false;
+  var id = (new URLSearchParams(location.search).get('c') || '').trim();
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function hash(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return ('0000000' + (h >>> 0).toString(16)).slice(-8); }
+  function api(path, opts) {
+    opts = opts || {};
+    var ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, 20000);
+    var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    if (opts.body) { headers['Content-Type'] = 'application/json'; headers.Prefer = 'return=minimal'; }
+    return fetch(SUPABASE_URL + '/rest/v1/' + path, { method: opts.body ? 'POST' : 'GET', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined, signal: ctrl.signal, cache: 'no-store' })
+      .then(function (r) { clearTimeout(timer); if (r.ok) return r.status === 204 || opts.body ? null : r.json(); return r.text().then(function (t) { var e = new Error(t || ('HTTP ' + r.status)); e.status = r.status; throw e; }); },
+            function (e) { clearTimeout(timer); e.network = true; throw e; });
+  }
+  function screen(icon, title, text, gray) { app.innerHTML = '<div class="card center"><div class="big' + (gray ? ' gray' : '') + '" aria-hidden="true">' + icon + '</div><h1>' + esc(title) + '</h1><p>' + esc(text) + '</p></div>'; window.scrollTo(0, 0); }
+  function closed() { screen('·', 'Este registro no está disponible', 'La convocatoria ya cerró o el enlace no es correcto. Si recibió este enlace hace poco, pida a quien se lo envió que lo confirme.', true); }
+
+  function renderForm() {
+    document.title = 'Registro · ' + conv.titulo;
+    var exp = ['No tengo experiencia en este cargo', 'Menos de 6 meses', 'Entre 6 meses y 1 año', 'Más de 1 año'];
+    var disp = ['Turno de día', 'Turno de noche', 'Fines de semana y festivos', 'Puedo empezar de inmediato'];
+    var src = ['WhatsApp', 'Facebook u otra red social', 'Me refirió un trabajador', 'Aviso o volante', 'Portal de empleo', 'Otro medio'];
+    app.innerHTML = '<div class="card">' +
+      '<span class="tag">Registro de candidatos</span><h1>' + esc(conv.titulo) + '</h1>' +
+      (conv.detalle ? '<p class="detail">' + esc(conv.detalle) + '</p>' : '') +
+      '<p class="resp">Convoca: ' + esc(conv.responsable) + '</p>' +
+      '<form id="f" novalidate>' +
+        '<div id="top"></div>' +
+        '<label class="f"><span class="lab">Nombre completo</span><input type="text" name="nombre" autocomplete="name" maxlength="120" required></label>' +
+        '<label class="f"><span class="lab">Celular</span><span class="hint">De preferencia el que usa en WhatsApp. Solo números.</span><input type="tel" name="celular" inputmode="numeric" autocomplete="tel" maxlength="20" required></label>' +
+        '<label class="f"><span class="lab">Barrio o localidad donde vive</span><input type="text" name="zona" maxlength="120" required></label>' +
+        '<label class="f"><span class="lab">Experiencia en este cargo o en uno parecido</span><select name="exp" required><option value="">Elija una opción</option>' + exp.map(function (o) { return '<option>' + o + '</option>'; }).join('') + '</select></label>' +
+        '<label class="f"><span class="lab">Cuéntenos dónde trabajó y qué hacía</span><span class="hint">Opcional. Unas pocas líneas bastan.</span><textarea name="expdet" maxlength="400"></textarea></label>' +
+        '<fieldset><legend>Disponibilidad</legend><span class="hint">Marque todas las que apliquen.</span>' + disp.map(function (o) { return '<label class="opt"><input type="checkbox" name="disp" value="' + o + '"><span>' + o + '</span></label>'; }).join('') + '<span id="e-disp"></span></fieldset>' +
+        '<label class="f"><span class="lab">¿Cómo se enteró de esta vacante?</span><select name="fuente" required><option value="">Elija una opción</option>' + src.map(function (o) { return '<option>' + o + '</option>'; }).join('') + '</select></label>' +
+        '<div class="hp" aria-hidden="true"><label>No llene este campo<input type="text" name="sitio" tabindex="-1" autocomplete="off"></label></div>' +
+        '<div class="consent"><label class="opt"><input type="checkbox" name="autoriza" required><span>Autorizo el tratamiento de mis datos personales para este proceso de selección.</span></label>' +
+          '<details><summary>Leer la autorización completa</summary><p class="aviso">' + esc(conv.aviso) + '</p></details><span id="e-aut"></span></div>' +
+        '<button class="go" type="submit">Enviar mi registro</button>' +
+      '</form></div><p class="foot">Sus datos solo los ve quien gestiona esta convocatoria.</p>';
+    document.getElementById('f').addEventListener('submit', submit);
+    document.getElementById('f').addEventListener('change', function (e) {
+      if (e.target.name === 'autoriza' && e.target.checked) document.getElementById('e-aut').innerHTML = '';
+      if (e.target.name === 'disp' && e.target.checked) document.getElementById('e-disp').innerHTML = '';
+    });
+  }
+
+  function mark(el, msg) { el.classList.add('bad'); var s = document.createElement('span'); s.className = 'fielderr'; s.textContent = msg; el.insertAdjacentElement('afterend', s); }
+  function submit(e) {
+    e.preventDefault(); if (sending) return;
+    var f = e.target, v = function (n) { return (f.elements[n].value || '').trim(); };
+    Array.prototype.forEach.call(f.querySelectorAll('.fielderr'), function (x) { x.remove(); });
+    Array.prototype.forEach.call(f.querySelectorAll('.bad'), function (x) { x.classList.remove('bad'); });
+    document.getElementById('top').innerHTML = ''; document.getElementById('e-disp').innerHTML = ''; document.getElementById('e-aut').innerHTML = '';
+    var cel = v('celular').replace(/[^0-9+]/g, ''), disp = Array.prototype.filter.call(f.querySelectorAll('[name=disp]'), function (x) { return x.checked; }).map(function (x) { return x.value; });
+    var first = null, bad = function (el, msg) { mark(el, msg); first = first || el; };
+    if (v('nombre').length < 5 || v('nombre').indexOf(' ') < 0) bad(f.elements.nombre, 'Escriba su nombre y apellido.');
+    if (!/^\+?[0-9]{7,15}$/.test(cel)) bad(f.elements.celular, 'Revise el número: solo números, sin espacios ni guiones.');
+    if (v('zona').length < 3) bad(f.elements.zona, 'Escriba el barrio o la localidad.');
+    if (!v('exp')) bad(f.elements.exp, 'Elija una opción.');
+    if (!disp.length) { document.getElementById('e-disp').innerHTML = '<span class="fielderr">Marque al menos una opción.</span>'; first = first || f.querySelector('[name=disp]'); }
+    if (!v('fuente')) bad(f.elements.fuente, 'Elija una opción.');
+    if (!f.elements.autoriza.checked) { document.getElementById('e-aut').innerHTML = '<span class="fielderr">Para enviar el registro necesitamos su autorización.</span>'; first = first || f.elements.autoriza; }
+    if (first) { first.focus(); first.scrollIntoView({ block: 'center' }); return; }
+    if (v('sitio')) { done(); return; } // campo trampa: lo llenan los programas automáticos, no las personas
+    var btn = f.querySelector('button.go'); sending = true; btn.disabled = true; btn.textContent = 'Enviando…';
+    api('talentos_postulaciones', { body: { convocatoria_id: conv.id, nombre: v('nombre').slice(0, 120), celular: cel, zona: v('zona'), experiencia: (v('exp') + (v('expdet') ? ' · ' + v('expdet') : '')).slice(0, 600), disponibilidad: disp.join(', ').slice(0, 200), fuente: v('fuente'), autoriza: true, aviso_version: hash(conv.aviso) } })
+      .then(done, function (err) {
+        sending = false; btn.disabled = false; btn.textContent = 'Enviar mi registro';
+        var t = String(err && err.message || '');
+        if (/convocatoria_cerrada/.test(t)) { closed(); return; }
+        var msg = /limite_alcanzado/.test(t) ? 'En este momento no podemos recibir más registros para esta vacante. Intente de nuevo más tarde.'
+          : err && err.network ? 'No se pudo enviar. Revise su conexión a internet y toque de nuevo «Enviar mi registro». Lo que escribió sigue aquí.'
+          : 'No pudimos guardar su registro. Revise los datos e intente de nuevo.';
+        document.getElementById('top').innerHTML = '<div class="msg err" role="alert">' + esc(msg) + '</div>'; window.scrollTo(0, 0);
+      });
+  }
+  function done() {
+    try { localStorage.setItem('reg_' + id, String(Date.now())); } catch (e) { /* sin almacenamiento */ }
+    app.innerHTML = '<div class="card center"><div class="big" aria-hidden="true">✓</div><h1>Registro recibido</h1><p>Gracias por su interés en la vacante de <strong>' + esc(conv.titulo) + '</strong>.</p><p>Si su perfil continúa en el proceso, le escribiremos o llamaremos al celular que registró.</p><p class="resp">Puede cerrar esta página.</p></div>';
+    window.scrollTo(0, 0);
+  }
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) { closed(); return; }
+  api('talentos_convocatorias?id=eq.' + encodeURIComponent(id) + '&select=id,titulo,detalle,responsable,contacto,aviso,activa').then(function (rows) {
+    conv = rows && rows[0]; if (!conv || !conv.activa) { closed(); return; }
+    var again = false; try { again = !!localStorage.getItem('reg_' + id); } catch (e) { /* sin almacenamiento */ }
+    renderForm();
+    if (again) document.getElementById('top').innerHTML = '<div class="msg ok">Desde este celular ya se envió un registro para esta vacante. Si necesita corregir algo, puede enviarlo de nuevo.</div>';
+  }, function (err) {
+    if (err && err.status && err.status !== 404 && err.status < 500 && !err.network) { closed(); return; }
+    app.innerHTML = '<div class="card center"><div class="big gray" aria-hidden="true">!</div><h1>No se pudo cargar</h1><p>Revise su conexión a internet e intente de nuevo.</p><button class="go" type="button" onclick="location.reload()">Reintentar</button></div>';
+  });
+})();
+</script>
+</body>
+</html>

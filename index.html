@@ -16,6 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <style>
   body { font-family: 'Inter', system-ui, sans-serif; background: #F8FAFC; color: #1E293B; }
   h1, h2, h3, .font-display { font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif; }
@@ -90,7 +91,7 @@
 var STORAGE_KEY = 'talentos_hr_app_v1';
 var STAGES = ['Postulación', 'Preselección', 'Entrevista', 'Pruebas', 'Aprobación', 'Contratación', 'Cierre'];
 var SLA_DEFAULT = [2, 3, 5, 4, 2, 3]; /* 0-4: días por etapa; 5: días máximos sin avance en contratación */
-var SOURCES = ['Portal de empleo', 'Referidos', 'Servicio Público de Empleo', 'Redes sociales', 'Volanteo', 'LinkedIn', 'Headhunting'];
+var SOURCES = ['Autorregistro', 'Portal de empleo', 'Referidos', 'Servicio Público de Empleo', 'Redes sociales', 'Volanteo', 'LinkedIn', 'Headhunting'];
 var AREAS = ['Producción', 'Logística', 'Distribución', 'Administración'];
 var TYPES = ['Operativo', 'Administrativo / Estratégico'];
 var SHIFTS = ['Mañana', 'Tarde', 'Noche', 'Diurno', 'Por asignar'];
@@ -222,11 +223,12 @@ function seed() {
   ];
   return { vacancies: vacancies, candidates: candidates, employees: employees, sla: SLA_DEFAULT.slice(), costs: { op: 2500000, adm: 6000000 }, read: [], demo: true };
 }
-function emptyState() { return { vacancies: [], candidates: [], employees: [], sla: SLA_DEFAULT.slice(), costs: { op: 2500000, adm: 6000000 }, read: [], demo: false }; }
+function emptyState() { return { vacancies: [], candidates: [], employees: [], sla: SLA_DEFAULT.slice(), costs: { op: 2500000, adm: 6000000 }, read: [], demo: false, forms: { parties: {}, avisos: {} } }; }
 function validState(d) { return !!d && Array.isArray(d.vacancies) && Array.isArray(d.candidates) && Array.isArray(d.employees); }
 function normalizeState(d) {
   var e = emptyState();
   d.sla = Array.isArray(d.sla) && d.sla.length === 6 ? d.sla : e.sla; d.costs = d.costs && typeof d.costs === 'object' ? d.costs : e.costs; d.read = Array.isArray(d.read) ? d.read : []; d.demo = !!d.demo;
+  d.forms = d.forms && typeof d.forms === 'object' ? d.forms : {}; d.forms.parties = d.forms.parties && typeof d.forms.parties === 'object' ? d.forms.parties : {}; d.forms.avisos = d.forms.avisos && typeof d.forms.avisos === 'object' ? d.forms.avisos : {};
   d.vacancies.forEach(function (v) { v.keywords = Array.isArray(v.keywords) ? v.keywords : []; });
   d.candidates.forEach(function (c) {
     c.history = Array.isArray(c.history) && c.history.length ? c.history : [{ stage: c.stage || 0, date: c.stageSince || today(), note: '' }]; c.notesLog = Array.isArray(c.notesLog) ? c.notesLog : [];
@@ -246,7 +248,7 @@ function getCfg() {
   try { var c = JSON.parse(localStorage.getItem(CFG_KEY) || 'null'); return c && c.url && c.key ? c : null; } catch (e) { return null; }
 }
 function chunkDocs() {
-  var out = { meta: JSON.stringify({ app: 'TalentOS HR', sla: state.sla, costs: state.costs, read: state.read, demo: !!state.demo }) };
+  var out = { meta: JSON.stringify({ app: 'TalentOS HR', sla: state.sla, costs: state.costs, read: state.read, demo: !!state.demo, forms: state.forms }) };
   COLS.forEach(function (col) { for (var i = 0; i < state[col].length; i += CHUNK) out[col + '/p' + (i / CHUNK)] = JSON.stringify({ items: state[col].slice(i, i + CHUNK) }); });
   return out;
 }
@@ -292,7 +294,7 @@ function connect(cfg) {
   }).catch(function () { store.mode = 'login'; store.authError = 'No se pudo conectar con Supabase. Revise la dirección del proyecto.'; render(); });
 }
 function enter(session) {
-  store.uid = session.user.id; store.email = session.user.email || ''; store.mode = 'loading'; store.authError = ''; store.slow = false; render();
+  store.uid = session.user.id; store.email = session.user.email || ''; store.forms = freshForms(); store.mode = 'loading'; store.authError = ''; store.slow = false; render();
   var slowTimer = setTimeout(function () { if (store.mode === 'loading') { store.slow = true; render(); } }, 10000);
   return store.sb.from(TABLE).select('key,data').then(checked).then(function (r) {
     clearTimeout(slowTimer);
@@ -302,11 +304,12 @@ function enter(session) {
       var parts = rows.filter(function (x) { return String(x.key).indexOf(col + '/p') === 0; }).map(function (x) { return { n: Number(String(x.key).split('/p')[1]) || 0, items: (x.data && x.data.items) || [] }; }).sort(function (a, b) { return a.n - b.n; });
       d[col] = [].concat.apply([], parts.map(function (p) { return p.items; }));
     });
-    if (meta) { d.sla = meta.sla; d.costs = meta.costs; d.read = meta.read; d.demo = meta.demo; }
+    if (meta) { d.sla = meta.sla; d.costs = meta.costs; d.read = meta.read; d.demo = meta.demo; d.forms = meta.forms; }
     state = normalizeState(d); store.mode = 'remote'; store.failed = false;
     store.cache = meta ? chunkDocs() : {};
     render();
     if (!meta) save();
+    loadForms();
   }).catch(function (e) {
     clearTimeout(slowTimer);
     var msg = ((e && e.message) || '') + ' ' + ((e && e.code) || '');
@@ -330,7 +333,7 @@ function renderGate() {
       '<p class="text-[11px] leading-relaxed text-slate-500">Las encuentra en Supabase con el botón Connect o en Settings → API Keys. Puede pegar la línea completa tal como la copia: aquí se toma solo la dirección y la clave. Use la clave pública (publishable); nunca la clave "secret" o "service_role".</p><button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('plug') + 'Conectar</button></form>';
     else if (store.mode === 'login') inner = err + '<form id="form-login" class="space-y-4">' + field('Correo', '<input name="email" type="email" required autocomplete="username" value="' + esc(store.lastEmail || '') + '" class="' + INPUT + '">') + field('Clave', '<input name="password" type="password" required autocomplete="current-password" class="' + INPUT + '">') + '<button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('log-in') + 'Ingresar</button></form>' + (cfg && !cfg.fixed ? '<button data-action="reset-cfg" class="mt-4 w-full text-center text-xs text-slate-400 hover:text-slate-600">Cambiar el proyecto de Supabase</button>' : '');
     else inner = err + '<div class="flex flex-wrap gap-2"><button data-action="retry" class="' + BTN_PRI + ' flex-1">' + ic('refresh-cw') + 'Reintentar</button>' + (store.sb ? '<button data-action="logout" class="' + BTN_SEC + ' flex-1">Cerrar sesión</button>' : '') + '</div>';
-    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div><span class="tnum ml-auto self-start rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">v1.2</span></div>' + inner + '</div></div>';
+    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div><span class="tnum ml-auto self-start rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">v1.3</span></div>' + inner + '</div></div>';
     g.dataset.sig = sig; icons();
   }
   g.hidden = false;
@@ -540,7 +543,7 @@ function toast(msg, kind) {
    ===================================================================== */
 function renderChrome() {
   var risk = hiringAtRisk().length, overdue = bottlenecks().length;
-  var groups = [['Selección', [['dashboard', 'layout-dashboard', 'Dashboard', 0], ['vacantes', 'briefcase', 'Vacantes', 0], ['pipeline', 'kanban-square', 'Pipeline de candidatos', overdue], ['evaluador', 'scan-search', 'Evaluador IA de Perfiles', 0]]],
+  var groups = [['Selección', [['dashboard', 'layout-dashboard', 'Dashboard', 0], ['vacantes', 'briefcase', 'Vacantes', 0], ['pipeline', 'kanban-square', 'Pipeline de candidatos', overdue], ['postulaciones', 'inbox', 'Postulaciones', store.forms.posts.length], ['evaluador', 'scan-search', 'Evaluador IA de Perfiles', 0]]],
     ['Ingreso y permanencia', [['contratacion', 'clipboard-check', 'Seguimiento de Contratación', risk], ['rotacion', 'users', 'Rotación y Retención', 0]]],
     ['Inteligencia', [['copiloto', 'sparkles', 'Copiloto IA', 0]]]];
   $('#nav').innerHTML = groups.map(function (g) {
@@ -567,7 +570,7 @@ function renderChrome() {
 function renderSideFoot() {
   var el = $('#side-foot'); if (!el) return;
   var SB = 'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white';
-  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos. <span class="tnum text-slate-500">v1.2</span></div>' +
+  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos. <span class="tnum text-slate-500">v1.3</span></div>' +
     (store.mode !== 'remote' ? '' : '<button data-action="export" class="' + SB + '">' + ic('download', 'h-3.5 w-3.5') + 'Exportar respaldo</button>' +
       '<label class="' + SB + ' cursor-pointer">' + ic('upload', 'h-3.5 w-3.5') + 'Restaurar respaldo<input id="backup-file" type="file" accept=".json,application/json" class="sr-only"></label>' +
       (isEmpty() ? '<button data-action="load-demo" class="' + SB + '">' + ic('flask-conical', 'h-3.5 w-3.5') + 'Cargar datos de ejemplo</button>' : '<button data-action="wipe" class="' + SB + '">' + ic('trash-2', 'h-3.5 w-3.5') + 'Borrar todos los datos</button>') +
@@ -587,7 +590,7 @@ function render() {
   if (ui.view === 'rotacion') drawRotationCharts();
   if (ui.view === 'evaluador' && ui.ev.status === 'done') animateGauge();
 }
-function go(view) { ui.view = view; ui.notifOpen = false; closeSidebar(); render(); window.scrollTo(0, 0); }
+function go(view) { ui.view = view; ui.notifOpen = false; closeSidebar(); render(); window.scrollTo(0, 0); if (view === 'postulaciones') loadForms(); }
 function closeSidebar() { $('#sidebar').classList.add('-translate-x-full'); $('#backdrop').hidden = true; }
 function chartsReady(ids) {
   if (window.Chart) { Chart.defaults.font.family = "'Inter', system-ui, sans-serif"; Chart.defaults.color = '#64748B'; return true; }
@@ -659,7 +662,7 @@ function vacancyCards() {
       '<div class="mt-3 flex flex-wrap gap-1.5">' + v.keywords.slice(0, 5).map(function (k) { return '<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">' + esc(k) + '</span>'; }).join('') + (v.keywords.length > 5 ? '<span class="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">+' + (v.keywords.length - 5) + '</span>' : '') + '</div>' +
       '<div class="mt-4"><div class="flex items-center justify-between text-xs"><span class="tnum text-slate-500">' + fmtDate(v.openDate) + ' → ' + fmtDate(v.deadline) + '</span><span class="tnum font-semibold ' + labelCls + '">' + label + '</span></div><div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow="' + p.pct + '" aria-valuemin="0" aria-valuemax="100" aria-label="Plazo consumido"><div class="h-full rounded-full ' + bar + '" style="width:' + p.pct + '%"></div></div></div>' +
       '<div class="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3 text-xs text-slate-600"><span class="tnum flex items-center gap-1.5">' + ic('users', 'h-3.5 w-3.5 text-slate-400') + '<b class="text-slate-900">' + open + '</b> en selección</span>' + (late ? '<span class="tnum flex items-center gap-1.5 font-medium text-red-600">' + ic('alert-triangle', 'h-3.5 w-3.5') + late + ' con SLA vencido</span>' : '') + '</div>' +
-      '<div class="mt-3 flex flex-wrap gap-2"><button data-action="go-pipeline" data-id="' + v.id + '" class="' + BTN_SEC + ' flex-1 !py-1.5 text-xs">' + ic('kanban-square', 'h-3.5 w-3.5') + 'Ver pipeline</button><button data-action="go-eval" data-id="' + v.id + '" class="' + BTN_SEC + ' flex-1 !py-1.5 text-xs">' + ic('scan-search', 'h-3.5 w-3.5') + 'Evaluar CV</button><button data-action="edit-vac" data-id="' + v.id + '" class="' + BTN_ICON + ' !h-8 !w-8" aria-label="Editar vacante" title="Editar vacante">' + ic('pencil', 'h-3.5 w-3.5') + '</button></div></article>';
+      '<div class="mt-3 flex flex-wrap gap-2"><button data-action="go-pipeline" data-id="' + v.id + '" class="' + BTN_SEC + ' flex-1 !py-1.5 text-xs">' + ic('kanban-square', 'h-3.5 w-3.5') + 'Ver pipeline</button><button data-action="go-eval" data-id="' + v.id + '" class="' + BTN_SEC + ' flex-1 !py-1.5 text-xs">' + ic('scan-search', 'h-3.5 w-3.5') + 'Evaluar CV</button><button data-action="edit-vac" data-id="' + v.id + '" class="' + BTN_ICON + ' !h-8 !w-8" aria-label="Editar vacante" title="Editar vacante">' + ic('pencil', 'h-3.5 w-3.5') + '</button></div>' + formButton(v) + '</article>';
   }).join('');
 }
 function viewVacantes() {
@@ -1123,7 +1126,195 @@ function confirmModal(title, text, label, action) { openModal(modalHead(title, '
 /* =====================================================================
    14. EVENTOS
    ===================================================================== */
-var VIEWS = { dashboard: viewDashboard, vacantes: viewVacantes, pipeline: viewPipeline, evaluador: viewEvaluador, contratacion: viewContratacion, rotacion: viewRotacion, copiloto: viewCopiloto };
+var AUTOREG_SQL = "-- TalentOS HR · Autorregistro de candidatos (versión 1.3)\n-- Se ejecuta UNA sola vez en Supabase → SQL Editor. Puede ejecutarse de nuevo sin dañar nada.\n--\n-- Qué crea:\n--   1. talentos_convocatorias: lo que el candidato ve al abrir el enlace (cargo, responsable de los datos,\n--      canal de contacto y texto de autorización). El público solo puede LEER las que están activas.\n--   2. talentos_postulaciones: lo que el candidato envía. El público solo puede INSERTAR;\n--      no puede leer, modificar ni borrar nada. Solo la dueña de la convocatoria las ve y las borra.\n\n-- ---------------------------------------------------------------------------------------------\n-- 1. Convocatorias\n-- ---------------------------------------------------------------------------------------------\ncreate table if not exists public.talentos_convocatorias (\n  id          uuid        primary key default gen_random_uuid(),\n  user_id     uuid        not null default auth.uid() references auth.users (id) on delete cascade,\n  vacancy_id  text        not null check (char_length(vacancy_id) between 1 and 80),\n  titulo      text        not null check (char_length(titulo) between 2 and 120),\n  detalle     text        not null default '' check (char_length(detalle) <= 600),\n  responsable text        not null check (char_length(responsable) between 2 and 160),\n  contacto    text        not null check (char_length(contacto) between 5 and 160),\n  aviso       text        not null check (char_length(aviso) between 50 and 4000),\n  activa      boolean     not null default true,\n  created_at  timestamptz not null default now(),\n  updated_at  timestamptz not null default now(),\n  unique (user_id, vacancy_id)\n);\n\nalter table public.talentos_convocatorias enable row level security;\n\ndrop policy if exists \"conv_publico_lee_activas\" on public.talentos_convocatorias;\ndrop policy if exists \"conv_duena_lee\"           on public.talentos_convocatorias;\ndrop policy if exists \"conv_duena_crea\"          on public.talentos_convocatorias;\ndrop policy if exists \"conv_duena_actualiza\"     on public.talentos_convocatorias;\ndrop policy if exists \"conv_duena_borra\"         on public.talentos_convocatorias;\n\ncreate policy \"conv_publico_lee_activas\" on public.talentos_convocatorias for select to anon          using (activa);\ncreate policy \"conv_duena_lee\"           on public.talentos_convocatorias for select to authenticated using (auth.uid() = user_id);\ncreate policy \"conv_duena_crea\"          on public.talentos_convocatorias for insert to authenticated with check (auth.uid() = user_id);\ncreate policy \"conv_duena_actualiza\"     on public.talentos_convocatorias for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);\ncreate policy \"conv_duena_borra\"         on public.talentos_convocatorias for delete to authenticated using (auth.uid() = user_id);\n\nrevoke all on public.talentos_convocatorias from anon, authenticated;\ngrant select (id, titulo, detalle, responsable, contacto, aviso, activa) on public.talentos_convocatorias to anon;\ngrant select, insert, update, delete on public.talentos_convocatorias to authenticated;\n\n-- ---------------------------------------------------------------------------------------------\n-- 2. Postulaciones\n-- ---------------------------------------------------------------------------------------------\ncreate table if not exists public.talentos_postulaciones (\n  id              uuid        primary key default gen_random_uuid(),\n  convocatoria_id uuid        not null references public.talentos_convocatorias (id) on delete cascade,\n  user_id         uuid        references auth.users (id) on delete cascade,\n  nombre          text        not null check (char_length(nombre) between 3 and 120),\n  celular         text        not null check (celular ~ '^[0-9+ ]{7,20}$'),\n  zona            text        not null default '' check (char_length(zona) <= 120),\n  experiencia     text        not null default '' check (char_length(experiencia) <= 600),\n  disponibilidad  text        not null default '' check (char_length(disponibilidad) <= 200),\n  fuente          text        not null default '' check (char_length(fuente) <= 80),\n  autoriza        boolean     not null check (autoriza),\n  aviso_version   text        not null default '' check (char_length(aviso_version) <= 40),\n  created_at      timestamptz not null default now()\n);\n\ncreate index if not exists talentos_postulaciones_user_idx on public.talentos_postulaciones (user_id, created_at desc);\ncreate index if not exists talentos_postulaciones_conv_idx on public.talentos_postulaciones (convocatoria_id);\n\n-- Antes de guardar: asigna la dueña (la de la convocatoria), fija identificador y fecha desde el servidor\n-- y limita la cantidad de registros pendientes por convocatoria para frenar envíos masivos.\ncreate or replace function public.talentos_postulacion_antes()\nreturns trigger\nlanguage plpgsql\nsecurity definer\nset search_path = ''\nas $$\ndeclare\n  duena uuid;\n  pendientes integer;\nbegin\n  select c.user_id into duena from public.talentos_convocatorias c where c.id = new.convocatoria_id and c.activa;\n  if duena is null then\n    raise exception 'convocatoria_cerrada' using errcode = 'P0001';\n  end if;\n  select count(*) into pendientes from public.talentos_postulaciones p where p.convocatoria_id = new.convocatoria_id;\n  if pendientes >= 300 then\n    raise exception 'limite_alcanzado' using errcode = 'P0001';\n  end if;\n  new.id := gen_random_uuid();\n  new.user_id := duena;\n  new.created_at := now();\n  return new;\nend;\n$$;\n\ndrop trigger if exists talentos_postulacion_antes on public.talentos_postulaciones;\ncreate trigger talentos_postulacion_antes before insert on public.talentos_postulaciones\n  for each row execute function public.talentos_postulacion_antes();\n\nalter table public.talentos_postulaciones enable row level security;\n\ndrop policy if exists \"post_publico_inserta\" on public.talentos_postulaciones;\ndrop policy if exists \"post_duena_lee\"       on public.talentos_postulaciones;\ndrop policy if exists \"post_duena_borra\"     on public.talentos_postulaciones;\n\ncreate policy \"post_publico_inserta\" on public.talentos_postulaciones for insert to anon          with check (autoriza);\ncreate policy \"post_duena_lee\"       on public.talentos_postulaciones for select to authenticated using (auth.uid() = user_id);\ncreate policy \"post_duena_borra\"     on public.talentos_postulaciones for delete to authenticated using (auth.uid() = user_id);\n\nrevoke all on public.talentos_postulaciones from anon, authenticated;\ngrant insert (convocatoria_id, nombre, celular, zona, experiencia, disponibilidad, fuente, autoriza, aviso_version) on public.talentos_postulaciones to anon;\ngrant select, delete on public.talentos_postulaciones to authenticated;\n\nrevoke all on function public.talentos_postulacion_antes() from public, anon, authenticated;\n";
+/* =====================================================================
+   13b. AUTORREGISTRO DE CANDIDATOS (v1.3)
+   El candidato llena un formulario público (registro.html) desde su celular. Sus datos llegan a la tabla
+   talentos_postulaciones, donde el público solo puede insertar. Aquí se publican los formularios por vacante
+   y se revisa la bandeja de postulaciones.
+   ===================================================================== */
+var T_CONV = 'talentos_convocatorias', T_POST = 'talentos_postulaciones';
+function freshForms() { return { status: 'idle', convs: [], posts: [], error: '' }; }
+store.forms = freshForms();
+function formsState() { if (!state.forms || typeof state.forms !== 'object') state.forms = {}; if (!state.forms.parties || typeof state.forms.parties !== 'object') state.forms.parties = {}; if (!state.forms.avisos || typeof state.forms.avisos !== 'object') state.forms.avisos = {}; return state.forms; }
+function formsBase() { return location.href.replace(/[?#].*$/, '').replace(/[^\/]*$/, ''); }
+function formLink(conv) { return formsBase() + 'registro.html?c=' + conv.id; }
+function convByVac(vid) { return store.forms.convs.find(function (c) { return c.vacancy_id === vid; }); }
+function convById(id) { return store.forms.convs.find(function (c) { return c.id === id; }); }
+function hashText(s) { var h = 2166136261; s = String(s || ''); for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return ('0000000' + (h >>> 0).toString(16)).slice(-8); }
+function fmtDateTime(iso) { var d = new Date(iso); if (isNaN(d.getTime())) return '—'; return fmtDate(toISO(d)) + ', ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+function digits(s) { return String(s || '').replace(/\D/g, '').slice(-10); }
+function avisoTemplate(resp, contacto, titulo) {
+  return 'AUTORIZACIÓN PARA EL TRATAMIENTO DE DATOS PERSONALES\n\n' +
+    'Al enviar este formulario autorizo de manera previa, expresa e informada a ' + (resp || '[responsable]') + ', como responsable del tratamiento, para recolectar, almacenar, usar y suprimir los datos personales que registro aquí.\n\n' +
+    'Finalidad: gestionar mi participación en el proceso de selección de la vacante «' + (titulo || '[vacante]') + '» y contactarme por llamada o WhatsApp para ese fin. Mis datos no se usarán para fines distintos.\n\n' +
+    'Datos que se recogen: nombre, número de celular, barrio o localidad, experiencia laboral, disponibilidad y medio por el que conocí la vacante. No se solicitan datos sensibles.\n\n' +
+    'Conservación: mis datos se conservarán durante el tiempo necesario para cumplir esta finalidad.\n\n' +
+    'Almacenamiento: la información se guarda en servidores de un proveedor tecnológico ubicados en Estados Unidos, con acceso restringido a quien gestiona el proceso de selección.\n\n' +
+    'Derechos: como titular puedo conocer, actualizar y rectificar mis datos, solicitar que se supriman, revocar esta autorización y presentar quejas ante la Superintendencia de Industria y Comercio. Para ejercerlos puedo escribir a: ' + (contacto || '[canal de contacto]') + '.';
+}
+function loadForms(quiet) {
+  if (!store.sb || store.mode !== 'remote') return Promise.resolve();
+  if (store.forms.status !== 'ready') store.forms.status = 'loading';
+  return Promise.all([store.sb.from(T_CONV).select('*').then(checked), store.sb.from(T_POST).select('*').order('created_at', { ascending: false }).then(checked)]).then(function (rs) {
+    store.forms.convs = rs[0].data || []; store.forms.posts = rs[1].data || []; store.forms.status = 'ready'; store.forms.error = '';
+  }).catch(function (e) {
+    var msg = ((e && e.message) || '') + ' ' + ((e && e.code) || '');
+    store.forms.status = /PGRST205|42P01|does not exist|schema cache|could not find the table/i.test(msg) ? 'missing' : 'error'; store.forms.error = msg.trim();
+  }).then(function () {
+    if (store.mode !== 'remote') return;
+    autoPauseForms(); renderChrome(); icons();
+    if (!quiet && !modalOpen() && (ui.view === 'postulaciones' || ui.view === 'vacantes')) render();
+  });
+}
+var pausing = {};
+function autoPauseForms() {
+  if (store.mode !== 'remote' || store.forms.status !== 'ready' || !store.sb) return;
+  store.forms.convs.forEach(function (conv) {
+    var v = vacById(conv.vacancy_id); if (!conv.activa || pausing[conv.id] || (v && v.status !== 'Cerrada')) return;
+    pausing[conv.id] = true; conv.activa = false;
+    store.sb.from(T_CONV).update({ activa: false, updated_at: new Date().toISOString() }).eq('id', conv.id).then(checked).then(function () {
+      delete pausing[conv.id]; toast('El formulario de «' + conv.titulo + '» se pausó porque la vacante ' + (v ? 'se cerró' : 'ya no existe') + '.', 'ok'); if (!modalOpen()) render();
+    }).catch(function () { delete pausing[conv.id]; conv.activa = true; });
+  });
+}
+var saveBase = save; save = function () { saveBase(); autoPauseForms(); };
+function formButton(v) {
+  var conv = convByVac(v.id), n = conv ? store.forms.posts.filter(function (p) { return p.convocatoria_id === conv.id; }).length : 0;
+  var chip = conv ? '<span class="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ' + (conv.activa ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500') + '"><span class="h-1.5 w-1.5 rounded-full ' + (conv.activa ? 'bg-emerald-500' : 'bg-slate-400') + '"></span>' + (conv.activa ? 'Recibiendo' : 'Pausado') + (n ? ' · ' + n : '') + '</span>' : '';
+  return '<button data-action="form-pub" data-id="' + v.id + '" class="' + BTN_SEC + ' mt-2 w-full !justify-start !py-1.5 text-xs">' + ic('qr-code', 'h-3.5 w-3.5') + 'Formulario de candidatos' + chip + '</button>';
+}
+function missingCard() {
+  return '<div class="card p-6"><div class="flex items-start gap-3"><span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-amber-50 text-amber-600">' + ic('database', 'h-5 w-5') + '</span><div class="min-w-0"><h3 class="font-display text-base font-bold text-slate-900">Falta un paso en Supabase (se hace una sola vez)</h3><p class="mt-1 text-sm text-slate-600">El autorregistro necesita dos tablas nuevas en su base de datos. Mientras no existan, no se puede publicar ningún formulario ni se recibe información.</p>' +
+    '<ol class="mt-3 list-decimal space-y-1 pl-5 text-sm text-slate-600"><li>Copie el script con el botón de abajo.</li><li>En Supabase, abra <strong>SQL Editor</strong>, péguelo y ejecútelo. Si aparece el aviso de operación destructiva, confirme.</li><li>Vuelva aquí y pulse <strong>Actualizar</strong>.</li></ol>' +
+    '<div class="mt-4 flex flex-wrap gap-2"><button data-action="sql-copy" class="' + BTN_PRI + '">' + ic('copy') + 'Copiar script</button><button data-action="posts-refresh" class="' + BTN_SEC + '">' + ic('refresh-cw') + 'Actualizar</button></div></div></div></div>';
+}
+function formsProblem() {
+  var F = store.forms;
+  if (F.status === 'missing') return missingCard();
+  if (F.status === 'error') return '<div class="card p-6"><p class="text-sm font-semibold text-slate-900">No se pudo consultar el autorregistro.</p><p class="mt-1 text-sm text-slate-600">Revise la conexión a internet y pulse Actualizar.</p><p class="mt-2 break-words text-xs text-slate-400">' + esc(F.error) + '</p><button data-action="posts-refresh" class="' + BTN_SEC + ' mt-4">' + ic('refresh-cw') + 'Actualizar</button></div>';
+  if (F.status !== 'ready') return '<div class="card px-6 py-14 text-center text-sm text-slate-500">Consultando el autorregistro…</div>';
+  return '';
+}
+function openFormModal(vacId) {
+  var v = vacById(vacId); if (!v) return;
+  var problem = formsProblem();
+  if (problem) { openModal(modalHead('Formulario de candidatos', v.title) + '<div class="px-6 py-5">' + problem + '</div>' + modalFoot('<button data-action="close-modal" class="' + BTN_SEC + '">Cerrar</button>')); if (store.forms.status === 'idle' || store.forms.status === 'loading') loadForms(true).then(function () { if (modalOpen() && $('#modal-title') && !$('#form-conv')) openFormModal(vacId); }); return; }
+  var conv = convByVac(vacId), parties = formsState().parties, names = Object.keys(parties);
+  var resp = conv ? conv.responsable : (names.length === 1 ? names[0] : ''), contacto = conv ? conv.contacto : (resp ? parties[resp] : ''), titulo = conv ? conv.titulo : v.title;
+  var aviso = conv ? conv.aviso : avisoTemplate(resp, contacto, titulo), auto = !conv || conv.aviso === avisoTemplate(conv.responsable, conv.contacto, conv.titulo);
+  var link = conv ? formLink(conv) : '', share = conv ? 'https://wa.me/?text=' + encodeURIComponent('Registro para la vacante de ' + conv.titulo + ': ' + link) : '';
+  var live = conv ? '<div class="border-b border-slate-200 px-6 py-5 ' + (conv.activa ? 'bg-emerald-50/50' : 'bg-slate-50') + '">' +
+      '<div class="flex flex-col gap-4 sm:flex-row sm:items-start"><div class="min-w-0 flex-1"><p class="flex items-center gap-2 text-sm font-semibold ' + (conv.activa ? 'text-emerald-800' : 'text-slate-600') + '"><span class="h-2 w-2 rounded-full ' + (conv.activa ? 'bg-emerald-500' : 'bg-slate-400') + '"></span>' + (conv.activa ? 'Formulario publicado y recibiendo registros' : 'Formulario pausado: el enlace muestra que la convocatoria cerró') + '</p>' +
+      '<label class="mt-3 block"><span class="mb-1 block text-xs font-medium text-slate-600">Enlace para los candidatos</span><input id="conv-link" readonly value="' + esc(link) + '" class="' + INPUT + ' font-mono !text-xs" onfocus="this.select()"></label>' +
+      '<div class="mt-3 flex flex-wrap gap-2"><button type="button" data-action="conv-copy" data-id="' + conv.id + '" class="' + BTN_SEC + ' !py-1.5 text-xs">' + ic('copy', 'h-3.5 w-3.5') + 'Copiar enlace</button>' +
+      '<a href="' + esc(share) + '" target="_blank" rel="noopener" class="' + BTN_SEC + ' !py-1.5 text-xs">' + ic('message-circle', 'h-3.5 w-3.5') + 'Compartir por WhatsApp</a>' +
+      '<a href="' + esc(link) + '" target="_blank" rel="noopener" class="' + BTN_SEC + ' !py-1.5 text-xs">' + ic('external-link', 'h-3.5 w-3.5') + 'Ver como candidato</a>' +
+      '<button type="button" data-action="conv-toggle" data-id="' + conv.id + '" class="' + BTN_SEC + ' !py-1.5 text-xs">' + ic(conv.activa ? 'pause' : 'play', 'h-3.5 w-3.5') + (conv.activa ? 'Pausar' : 'Reactivar') + '</button></div></div>' +
+      '<div class="flex flex-none flex-col items-center gap-2"><canvas id="conv-qr" class="h-36 w-36 rounded-xl border border-slate-200 bg-white" aria-label="Código QR del formulario"></canvas><button type="button" data-action="conv-qr" data-id="' + conv.id + '" class="' + BTN_SEC + ' !py-1.5 text-xs">' + ic('download', 'h-3.5 w-3.5') + 'Descargar QR</button></div></div></div>' : '';
+  openModal('<form id="form-conv" data-id="' + v.id + '">' + modalHead('Formulario de candidatos', v.title + (conv ? '' : ' · aún no publicado')) + live +
+    '<div class="grid gap-4 px-6 py-5 sm:grid-cols-2">' +
+      field('Cargo que verá el candidato', '<input name="titulo" required minlength="2" maxlength="120" value="' + esc(titulo) + '" class="' + INPUT + '">', true) +
+      field('Información adicional (opcional)', '<textarea name="detalle" rows="2" maxlength="600" placeholder="Por ejemplo: zona de trabajo, horario o tipo de contrato. Escriba solo lo que esté confirmado." class="' + INPUT + '">' + esc(conv ? conv.detalle : '') + '</textarea>', true) +
+      field('Responsable del tratamiento de datos', '<input name="responsable" required minlength="2" maxlength="160" list="conv-parties" autocomplete="off" placeholder="Razón social o nombre completo" value="' + esc(resp) + '" class="' + INPUT + '"><datalist id="conv-parties">' + names.map(function (n) { return '<option value="' + esc(n) + '"></option>'; }).join('') + '</datalist>') +
+      field('Canal para ejercer derechos sobre los datos', '<input name="contacto" required minlength="5" maxlength="160" autocomplete="off" placeholder="Correo o teléfono de contacto" value="' + esc(contacto) + '" class="' + INPUT + '">') +
+      '<div class="sm:col-span-2"><div class="mb-1 flex items-center justify-between gap-2"><span class="text-xs font-medium text-slate-600">Texto de autorización que acepta el candidato</span><button type="button" data-action="aviso-reset" class="text-xs font-medium text-indigo-600 hover:underline">Usar texto sugerido</button></div><textarea name="aviso" rows="9" required minlength="50" maxlength="4000" data-auto="' + (auto ? '1' : '0') + '" class="' + INPUT + ' !text-xs leading-relaxed">' + esc(aviso) + '</textarea><p class="mt-1.5 text-xs text-slate-500">Es un texto sugerido. Hágalo revisar por un abogado antes de compartir el enlace; puede editarlo aquí. Debe nombrar al responsable y el canal de contacto.</p></div>' +
+    '</div>' + modalFoot('<button type="button" data-action="close-modal" class="' + BTN_SEC + '">Cerrar</button><button type="submit" class="' + BTN_PRI + '">' + ic(conv ? 'save' : 'send') + (conv ? 'Guardar cambios' : 'Publicar formulario') + '</button>') + '</form>', true);
+  if (conv) { var cv = $('#conv-qr'); if (cv && !drawQR(cv, link, 6)) cv.outerHTML = '<p class="w-36 text-center text-xs text-slate-400">No se pudo generar el QR. Use el enlace.</p>'; }
+}
+function submitConv(f, d) {
+  var v = vacById(f.dataset.id); if (!v) return;
+  if (v.status === 'Cerrada') { toast('La vacante está cerrada. Reábrala para publicar o cambiar el formulario.', 'warn'); return; }
+  if (d.aviso.indexOf(d.responsable) < 0 || d.aviso.indexOf(d.contacto) < 0) { toast('El texto de autorización debe nombrar al responsable y el canal de contacto tal como los escribió.', 'warn'); return; }
+  var btn = f.querySelector('button[type=submit]'), was = !!convByVac(v.id); btn.disabled = true;
+  store.sb.from(T_CONV).upsert({ user_id: store.uid, vacancy_id: v.id, titulo: d.titulo, detalle: d.detalle || '', responsable: d.responsable, contacto: d.contacto, aviso: d.aviso, activa: true, updated_at: new Date().toISOString() }, { onConflict: 'user_id,vacancy_id' }).then(checked).then(function () {
+    formsState().parties[d.responsable] = d.contacto;
+    formsState().avisos[hashText(d.aviso)] = { text: d.aviso, date: today(), responsable: d.responsable };
+    save(); return loadForms(true);
+  }).then(function () { render(); openFormModal(v.id); toast(was ? 'Cambios guardados. El enlace es el mismo.' : 'Formulario publicado. Ya puede compartir el enlace o el QR.', 'ok'); })
+    .catch(function (e) { btn.disabled = false; toast('No se pudo publicar el formulario. ' + (((e && e.message) || '').slice(0, 120)), 'warn'); });
+}
+function toggleConv(id) {
+  var conv = convById(id); if (!conv) return;
+  var tv = vacById(conv.vacancy_id); if (!conv.activa && (!tv || tv.status === 'Cerrada')) { toast('La vacante está cerrada. Reábrala para reactivar el formulario.', 'warn'); return; }
+  store.sb.from(T_CONV).update({ activa: !conv.activa, updated_at: new Date().toISOString() }).eq('id', id).then(checked).then(function () { return loadForms(true); })
+    .then(function () { render(); openFormModal(conv.vacancy_id); toast(conv.activa ? 'Formulario pausado. El enlace ya no recibe registros.' : 'Formulario reactivado.', 'ok'); })
+    .catch(function () { toast('No se pudo cambiar el estado del formulario.', 'warn'); });
+}
+function copyText(text, okMsg) {
+  var done = function () { toast(okMsg, 'ok'); }, fallback = function () { var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; } ta.remove(); if (ok) done(); else toast('No se pudo copiar automáticamente. Selecciónelo y cópielo a mano.', 'warn'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+}
+function qrMatrix(text) { if (typeof qrcode !== 'function') return null; try { var q = qrcode(0, 'M'); q.addData(text); q.make(); return q; } catch (e) { return null; } }
+function drawQR(canvas, text, scale, top) {
+  var q = qrMatrix(text); if (!q || !canvas.getContext) return false;
+  var n = q.getModuleCount(), m = 4, s = scale || 8, g = canvas.getContext('2d'), y0 = top || 0;
+  if (!top) { canvas.width = canvas.height = (n + m * 2) * s; g.fillStyle = '#ffffff'; g.fillRect(0, 0, canvas.width, canvas.height); }
+  g.fillStyle = '#0f172a';
+  for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect((c + m) * s, y0 + (r + m) * s, s, s);
+  return (n + m * 2) * s;
+}
+function downloadQR(id) {
+  var conv = convById(id); if (!conv) return;
+  var q = qrMatrix(formLink(conv)); if (!q) { toast('No se pudo generar el QR. Use el enlace.', 'warn'); return; }
+  var s = 14, size = (q.getModuleCount() + 8) * s, cv = document.createElement('canvas'), g = cv.getContext('2d');
+  cv.width = size; cv.height = size + 150; g.fillStyle = '#ffffff'; g.fillRect(0, 0, cv.width, cv.height);
+  g.fillStyle = '#0f172a'; g.textAlign = 'center'; g.font = '600 ' + Math.round(size / 22) + 'px system-ui, Arial, sans-serif'; g.fillText('Escanee para registrarse', size / 2, 54);
+  drawQR(cv, formLink(conv), s, 62);
+  var title = conv.titulo.length > 38 ? conv.titulo.slice(0, 36) + '…' : conv.titulo;
+  g.font = '700 ' + Math.round(size / 17) + 'px system-ui, Arial, sans-serif'; g.fillText(title, size / 2, size + 100);
+  var a = document.createElement('a'); a.href = cv.toDataURL('image/png'); a.download = 'QR ' + conv.titulo.replace(/[^\wáéíóúñÁÉÍÓÚÑ -]/g, '').trim() + '.png'; document.body.appendChild(a); a.click(); a.remove();
+}
+function postDuplicate(p, conv) {
+  var d = digits(p.celular); if (!d) return false;
+  var inPipe = conv && state.candidates.some(function (c) { return c.vacancyId === conv.vacancy_id && digits(c.phone) === d; });
+  var inBox = store.forms.posts.some(function (o) { return o.id !== p.id && o.convocatoria_id === p.convocatoria_id && digits(o.celular) === d; });
+  return inPipe ? 'Ya está en el pipeline' : (inBox ? 'Registro repetido' : '');
+}
+function viewPostulaciones() {
+  var F = store.forms, head = pageHead('Postulaciones recibidas', 'Registros que los candidatos enviaron desde su celular. Revise cada uno y acéptelo en el pipeline o descártelo.', '<button data-action="posts-refresh" class="' + BTN_SEC + '">' + ic('refresh-cw') + 'Actualizar</button>');
+  var problem = formsProblem(); if (problem) return head + problem;
+  var active = F.convs.filter(function (c) { return c.activa; }).length;
+  if (!F.posts.length) return head + '<div class="card px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">' + ic('inbox', 'h-6 w-6') + '</span><p class="mt-4 font-display text-base font-bold text-slate-900">' + (F.convs.length ? 'No hay registros pendientes' : 'Aún no ha publicado ningún formulario') + '</p><p class="mx-auto mt-1 max-w-md text-sm text-slate-500">' + (F.convs.length ? plural(active, 'formulario activo', 'formularios activos') + '. Los registros nuevos aparecerán aquí; pulse Actualizar para consultarlos.' : 'En Vacantes, cada tarjeta tiene el botón Formulario de candidatos. Publíquelo y comparta el enlace o el código QR.') + '</p><button data-action="nav" data-view="vacantes" class="' + BTN_SEC + ' mt-5">' + ic('briefcase') + 'Ir a Vacantes</button></div>';
+  return head + '<p class="mb-4 text-sm text-slate-500">' + plural(F.posts.length, 'registro pendiente', 'registros pendientes') + ' · ' + plural(active, 'formulario activo', 'formularios activos') + '</p><div class="grid gap-4 lg:grid-cols-2">' + F.posts.map(function (p) {
+    var conv = convById(p.convocatoria_id), v = conv && vacById(conv.vacancy_id), dup = postDuplicate(p, conv), d = digits(p.celular), wa = d.length === 10 ? 'https://wa.me/57' + d : '';
+    var row = function (label, val) { return val ? '<div class="flex gap-2 text-sm"><dt class="w-28 flex-none text-slate-400">' + label + '</dt><dd class="min-w-0 flex-1 whitespace-pre-wrap break-words text-slate-700">' + esc(val) + '</dd></div>' : ''; };
+    return '<article class="card flex flex-col p-5"><div class="flex items-start gap-3">' + avatar(p.nombre) + '<div class="min-w-0 flex-1"><h3 class="truncate font-display text-base font-bold text-slate-900">' + esc(p.nombre) + '</h3><p class="truncate text-sm text-slate-500">' + esc(v ? v.title : (conv ? conv.titulo + ' · vacante eliminada' : 'Convocatoria eliminada')) + '</p></div>' + (dup ? '<span class="flex-none rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200">' + dup + '</span>' : '') + '</div>' +
+      '<dl class="mt-4 space-y-1.5">' + '<div class="flex gap-2 text-sm"><dt class="w-28 flex-none text-slate-400">Celular</dt><dd class="tnum min-w-0 flex-1 text-slate-700">' + esc(p.celular) + (wa ? ' · <a href="' + wa + '" target="_blank" rel="noopener" class="font-medium text-indigo-600 hover:underline">WhatsApp</a>' : '') + '</dd></div>' + row('Vive en', p.zona) + row('Experiencia', p.experiencia) + row('Disponibilidad', p.disponibilidad) + row('Se enteró por', p.fuente) + row('Recibido', fmtDateTime(p.created_at)) + '</dl>' +
+      '<p class="mt-3 flex items-center gap-1.5 text-xs text-emerald-700">' + ic('shield-check', 'h-3.5 w-3.5') + 'Autorizó el tratamiento de datos · texto ' + esc(p.aviso_version || 's/v') + '</p>' +
+      '<div class="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4"><button data-action="post-accept" data-id="' + p.id + '" class="' + BTN_PRI + ' flex-1 !py-2 text-xs"' + (v ? '' : ' disabled') + '>' + ic('user-check', 'h-3.5 w-3.5') + 'Aceptar en el pipeline</button><button data-action="post-discard" data-id="' + p.id + '" class="' + BTN_SEC + ' !py-2 text-xs">' + ic('trash-2', 'h-3.5 w-3.5') + 'Descartar</button></div></article>';
+  }).join('') + '</div>';
+}
+function acceptPost(id) {
+  var p = store.forms.posts.find(function (x) { return x.id === id; }); if (!p) return;
+  var conv = convById(p.convocatoria_id), v = conv && vacById(conv.vacancy_id);
+  if (!v) { toast('La vacante de este registro ya no existe. Descártelo o cree de nuevo la vacante.', 'warn'); return; }
+  var reg = new Date(p.created_at), regDate = isNaN(reg.getTime()) ? today() : toISO(reg);
+  var notes = [p.zona ? 'Vive en: ' + p.zona : '', p.experiencia ? 'Experiencia: ' + p.experiencia : '', p.disponibilidad ? 'Disponibilidad: ' + p.disponibilidad : '', p.fuente ? 'Se enteró por: ' + p.fuente : ''].filter(Boolean).join('\n');
+  state.candidates.push({ id: uid('c'), name: p.nombre, email: '', phone: p.celular, source: 'Autorregistro', notes: notes, vacancyId: v.id, stage: 0, stageSince: regDate, match: null, createdAt: regDate, outcome: null, consent: true,
+    consentInfo: { via: 'autorregistro', at: p.created_at, version: p.aviso_version || '', responsable: conv.responsable },
+    history: [{ stage: 0, date: regDate, note: 'Autorregistro del candidato el ' + fmtDateTime(p.created_at) + '. Autorizó el tratamiento de datos (responsable: ' + conv.responsable + '; texto ' + (p.aviso_version || 's/v') + ').' }], notesLog: [], hiring: null });
+  save();
+  store.forms.posts = store.forms.posts.filter(function (x) { return x.id !== id; }); render();
+  toast(p.nombre + ' quedó en Postulación de ' + v.title + '.', 'ok');
+  store.sb.from(T_POST).delete().eq('id', id).then(checked).catch(function () { toast('Quedó en el pipeline, pero no se pudo retirar de la bandeja. Pulse Actualizar y descártelo.', 'warn'); });
+}
+function discardPost(id) {
+  var p = store.forms.posts.find(function (x) { return x.id === id; }); if (!p) return;
+  store.sb.from(T_POST).delete().eq('id', id).then(checked).then(function () {
+    store.forms.posts = store.forms.posts.filter(function (x) { return x.id !== id; }); closeModal(); render(); toast('Registro eliminado de forma definitiva.', 'ok');
+  }).catch(function () { closeModal(); toast('No se pudo eliminar el registro. Intente de nuevo.', 'warn'); });
+}
+document.addEventListener('input', function (e) {
+  var f = e.target && e.target.closest ? e.target.closest('#form-conv') : null; if (!f) return;
+  var av = f.elements.aviso, n = e.target.name;
+  if (n === 'aviso') { av.dataset.auto = '0'; return; }
+  if (n === 'responsable') { var known = formsState().parties[f.elements.responsable.value.trim()]; if (known && (!f.elements.contacto.value.trim() || f.elements.contacto.dataset.filled === '1')) { f.elements.contacto.value = known; f.elements.contacto.dataset.filled = '1'; } }
+  if (n === 'contacto') f.elements.contacto.dataset.filled = '0';
+  if ((n === 'responsable' || n === 'contacto' || n === 'titulo') && av.dataset.auto === '1') av.value = avisoTemplate(f.elements.responsable.value.trim(), f.elements.contacto.value.trim(), f.elements.titulo.value.trim());
+});
+
+var VIEWS = { dashboard: viewDashboard, vacantes: viewVacantes, pipeline: viewPipeline, postulaciones: viewPostulaciones, evaluador: viewEvaluador, contratacion: viewContratacion, rotacion: viewRotacion, copiloto: viewCopiloto };
 var pendingId = null, pendingBackup = null;
 
 document.addEventListener('click', function (e) {
@@ -1149,13 +1340,23 @@ document.addEventListener('click', function (e) {
     case 'wipe': confirmModal('Borrar todos los datos', 'Se eliminarán de forma definitiva las ' + state.vacancies.length + ' vacantes, ' + state.candidates.length + ' candidatos y ' + state.employees.length + ' colaboradores. Exporte un respaldo antes si los necesita.', 'Borrar todo', 'wipe-yes'); break;
     case 'wipe-yes': state = emptyState(); save(); ui.pipeVac = ''; ui.ev = freshEv(); ui.cop = freshCop(); closeModal(); ui.view = 'dashboard'; render(); toast('Datos eliminados. El sistema quedó vacío.', 'ok'); break;
     case 'export': (function () { var blob = new Blob([JSON.stringify({ app: 'TalentOS HR', exportedAt: today(), state: state }, null, 1)], { type: 'application/json' }), link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'talentos-hr-respaldo-' + today() + '.json'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(function () { URL.revokeObjectURL(link.href); }, 3000); toast('Respaldo descargado. Guárdelo en un lugar seguro: contiene datos personales.', 'ok'); })(); break;
-    case 'logout': closeModal(); closeSidebar(); (store.sb ? store.sb.auth.signOut() : Promise.resolve()).catch(function () {}).then(function () { state = emptyState(); store.cache = {}; store.uid = null; store.email = ''; store.authError = ''; store.mode = 'login'; ui.view = 'dashboard'; render(); }); break;
+    case 'logout': closeModal(); closeSidebar(); (store.sb ? store.sb.auth.signOut() : Promise.resolve()).catch(function () {}).then(function () { state = emptyState(); store.cache = {}; store.forms = freshForms(); store.uid = null; store.email = ''; store.authError = ''; store.mode = 'login'; ui.view = 'dashboard'; render(); }); break;
     case 'retry': boot(); break;
     case 'reset-cfg': try { localStorage.removeItem(CFG_KEY); } catch (err2) { /* sin almacenamiento */ } store.sb = null; store.authError = ''; store.mode = 'setup'; render(); break;
     case 'backup-yes': if (pendingBackup) { state = normalizeState(pendingBackup); pendingBackup = null; save(); closeModal(); render(); toast('Respaldo restaurado.', 'ok'); } break;
     case 'new-emp': openEmployeeModal(); break;
     case 'import-emp': closeSidebar(); openImportModal(); break;
     case 'close-modal': closeModal(); break;
+    case 'form-pub': ui.formVac = id; openFormModal(id); break;
+    case 'conv-copy': c = convById(id); if (c) copyText(formLink(c), 'Enlace copiado.'); break;
+    case 'conv-qr': downloadQR(id); break;
+    case 'conv-toggle': toggleConv(id); break;
+    case 'aviso-reset': (function () { var fc = $('#form-conv'); if (!fc) return; fc.elements.aviso.value = avisoTemplate(fc.elements.responsable.value.trim(), fc.elements.contacto.value.trim(), fc.elements.titulo.value.trim()); fc.elements.aviso.dataset.auto = '1'; })(); break;
+    case 'sql-copy': copyText(AUTOREG_SQL, 'Script copiado. Péguelo en el SQL Editor de Supabase y ejecútelo.'); break;
+    case 'posts-refresh': (function (inModal) { loadForms(true).then(function () { render(); if (inModal && ui.formVac) openFormModal(ui.formVac); else if (store.forms.status === 'ready') toast('Bandeja actualizada.', 'ok'); }); })(!!b.closest('#modal-root')); break;
+    case 'post-accept': acceptPost(id); break;
+    case 'post-discard': pendingId = id; confirmModal('Descartar registro', 'El registro se eliminará de forma definitiva y no se podrá recuperar.', 'Descartar', 'post-discard-yes'); break;
+    case 'post-discard-yes': discardPost(pendingId); break;
     case 'new-vac': openVacancyModal(); break;
     case 'edit-vac': openVacancyModal(id); break;
     case 'kw-del': ui.draftKeywords.splice(Number(b.dataset.i), 1); refreshKeywords(); break;
@@ -1199,6 +1400,7 @@ document.addEventListener('submit', function (e) {
   e.preventDefault();
   var f = e.target, d = {}; new FormData(f).forEach(function (v, k) { d[k] = typeof v === 'string' ? v.trim() : v; });
   var t = today(), c, v;
+  if (f.id === 'form-conv') { submitConv(f, d); return; }
   if (f.id === 'form-setup') {
     var pc = parseConn(d.url, d.key), url = pc.url, key = pc.key;
     if (pc.secret) { store.authError = 'Esa es una clave secreta. Use la clave pública (publishable).'; render(); return; }
