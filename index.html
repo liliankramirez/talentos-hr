@@ -28,6 +28,8 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .fade-in { animation: fadeIn .25s ease-out both; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .no-bar { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .no-bar::-webkit-scrollbar { display: none; }
   .scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
   .scroll-thin::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 8px; }
   .dropzone.is-over { border-color: #4F46E5; background: #EEF2FF; }
@@ -53,16 +55,16 @@
 </aside>
 
 <div class="flex min-h-screen flex-col lg:pl-64">
-  <header class="sticky z-20 border-b border-slate-200 bg-white/90 backdrop-blur" style="top:0">
-    <div class="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-      <button data-action="toggle-sidebar" class="rounded-lg border border-slate-200 p-2 text-slate-600 lg:hidden" aria-label="Abrir menú"><i data-lucide="menu" class="h-4 w-4"></i></button>
-      <div class="relative min-w-0 flex-1 basis-56">
+  <header class="sticky z-20 border-b border-slate-200 bg-white lg:bg-white/90 lg:backdrop-blur" style="top:0">
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 sm:px-6 lg:py-3">
+      <button data-action="toggle-sidebar" class="order-1 flex-none rounded-lg border border-slate-200 p-2 text-slate-600 lg:hidden" aria-label="Abrir menú"><i data-lucide="menu" class="h-4 w-4"></i></button>
+      <div class="relative order-2 min-w-0 flex-1 basis-40 lg:basis-56">
         <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
         <input id="global-search" type="search" autocomplete="off" placeholder="Buscar candidatos, vacantes o colaboradores…" aria-label="Buscador global" class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm placeholder:text-slate-400 focus:bg-white">
         <div id="search-results" class="card absolute left-0 right-0 top-full z-30 mt-2 max-h-80 overflow-y-auto p-1.5" hidden></div>
       </div>
-      <div id="quick-filters" class="flex flex-wrap items-center gap-1.5" aria-label="Filtros rápidos"></div>
-      <div class="relative ml-auto">
+      <div id="quick-filters" class="no-bar order-4 -mx-4 flex w-[calc(100%+2rem)] flex-nowrap items-center gap-1.5 overflow-x-auto px-4 sm:-mx-6 sm:w-[calc(100%+3rem)] sm:px-6 lg:order-3 lg:mx-0 lg:w-auto lg:flex-wrap lg:overflow-visible lg:px-0" aria-label="Filtros rápidos"></div>
+      <div class="relative order-3 ml-auto flex-none lg:order-4">
         <button data-action="toggle-notif" class="relative rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="Centro de alertas">
           <i data-lucide="bell" class="h-5 w-5"></i>
           <span id="notif-count" class="tnum absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white" hidden></span>
@@ -323,12 +325,12 @@ function renderGate() {
     var inner;
     if (store.mode === 'loading') inner = '<div class="flex flex-col items-center py-6 text-center"><span class="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">' + ic('loader-2', 'spin h-6 w-6') + '</span><p class="mt-3 text-sm font-semibold text-slate-800">Cargando sus datos…</p>' + (store.slow ? '<p class="mt-1 text-xs text-slate-500">La conexión tarda más de lo normal. No cierre la página.</p>' : '') + '</div>';
     else if (store.mode === 'setup') inner = err + '<form id="form-setup" class="space-y-4"><p class="text-sm text-slate-600">Conecte esta página con su proyecto de Supabase. Solo se hace una vez en cada equipo.</p>' +
-      field('Dirección del proyecto (Project URL)', '<input name="url" type="url" required placeholder="https://xxxxxxxx.supabase.co" autocomplete="off" class="' + INPUT + '">') +
-      field('Clave pública (anon o publishable)', '<textarea name="key" rows="3" required autocomplete="off" spellcheck="false" placeholder="eyJ… o sb_publishable_…" class="' + INPUT + ' font-mono text-xs"></textarea>') +
-      '<p class="text-[11px] leading-relaxed text-slate-500">Las encuentra en Supabase, en Project Settings → API. Use la clave pública; nunca la clave "service_role" o "secret".</p><button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('plug') + 'Conectar</button></form>';
+      field('Dirección del proyecto (Project URL)', '<input name="url" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" required placeholder="https://xxxxxxxx.supabase.co" autocomplete="off" class="' + INPUT + '">') +
+      field('Clave pública (publishable)', '<textarea name="key" rows="3" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="sb_publishable_…" class="' + INPUT + ' font-mono text-xs"></textarea>') +
+      '<p class="text-[11px] leading-relaxed text-slate-500">Las encuentra en Supabase con el botón Connect o en Settings → API Keys. Puede pegar la línea completa tal como la copia: aquí se toma solo la dirección y la clave. Use la clave pública (publishable); nunca la clave "secret" o "service_role".</p><button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('plug') + 'Conectar</button></form>';
     else if (store.mode === 'login') inner = err + '<form id="form-login" class="space-y-4">' + field('Correo', '<input name="email" type="email" required autocomplete="username" class="' + INPUT + '">') + field('Clave', '<input name="password" type="password" required autocomplete="current-password" class="' + INPUT + '">') + '<button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('log-in') + 'Ingresar</button></form>' + (cfg && !cfg.fixed ? '<button data-action="reset-cfg" class="mt-4 w-full text-center text-xs text-slate-400 hover:text-slate-600">Cambiar el proyecto de Supabase</button>' : '');
     else inner = err + '<div class="flex flex-wrap gap-2"><button data-action="retry" class="' + BTN_PRI + ' flex-1">' + ic('refresh-cw') + 'Reintentar</button>' + (store.sb ? '<button data-action="logout" class="' + BTN_SEC + ' flex-1">Cerrar sesión</button>' : '') + '</div>';
-    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div></div>' + inner + '</div></div>';
+    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div><span class="tnum ml-auto self-start rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">v1.1</span></div>' + inner + '</div></div>';
     g.dataset.sig = sig; icons();
   }
   g.hidden = false;
@@ -548,8 +550,8 @@ function renderChrome() {
     }).join('');
   }).join('');
   var f = ui.filters, chips = [['overdue', 'SLA vencido', 'alert-triangle'], ['high', 'Match ≥ 75%', 'sparkles'], ['unscored', 'Sin evaluar', 'circle-dashed']];
-  $('#quick-filters').innerHTML = (state.demo ? '<span class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">Datos de ejemplo</span>' : '') + chips.map(function (ch) {
-    return '<button data-action="toggle-filter" data-filter="' + ch[0] + '" aria-pressed="' + f[ch[0]] + '" class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ' + (f[ch[0]] ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-700') + '">' + ic(ch[2], 'h-3.5 w-3.5') + ch[1] + '</button>';
+  $('#quick-filters').innerHTML = (state.demo ? '<span class="inline-flex flex-none items-center whitespace-nowrap rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">Datos de ejemplo</span>' : '') + chips.map(function (ch) {
+    return '<button data-action="toggle-filter" data-filter="' + ch[0] + '" aria-pressed="' + f[ch[0]] + '" class="inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium ' + (f[ch[0]] ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-700') + '">' + ic(ch[2], 'h-3.5 w-3.5') + ch[1] + '</button>';
   }).join('');
   var alerts = allAlerts(), unread = alerts.filter(function (a) { return state.read.indexOf(a.key) < 0; }).length, cnt = $('#notif-count');
   cnt.textContent = unread > 99 ? '99+' : unread; cnt.hidden = !unread;
@@ -565,7 +567,7 @@ function renderChrome() {
 function renderSideFoot() {
   var el = $('#side-foot'); if (!el) return;
   var SB = 'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white';
-  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos.</div>' +
+  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos. <span class="tnum text-slate-500">v1.1</span></div>' +
     (store.mode !== 'remote' ? '' : '<button data-action="export" class="' + SB + '">' + ic('download', 'h-3.5 w-3.5') + 'Exportar respaldo</button>' +
       '<label class="' + SB + ' cursor-pointer">' + ic('upload', 'h-3.5 w-3.5') + 'Restaurar respaldo<input id="backup-file" type="file" accept=".json,application/json" class="sr-only"></label>' +
       (isEmpty() ? '<button data-action="load-demo" class="' + SB + '">' + ic('flask-conical', 'h-3.5 w-3.5') + 'Cargar datos de ejemplo</button>' : '<button data-action="wipe" class="' + SB + '">' + ic('trash-2', 'h-3.5 w-3.5') + 'Borrar todos los datos</button>') +
@@ -1198,9 +1200,10 @@ document.addEventListener('submit', function (e) {
   var f = e.target, d = {}; new FormData(f).forEach(function (v, k) { d[k] = typeof v === 'string' ? v.trim() : v; });
   var t = today(), c, v;
   if (f.id === 'form-setup') {
-    var url = d.url.replace(/\/+$/, ''), key = d.key.replace(/\s+/g, '');
+    var pc = parseConn(d.url, d.key), url = pc.url, key = pc.key;
+    if (pc.secret) { store.authError = 'Esa es una clave secreta. Use la clave pública (publishable).'; render(); return; }
     if (!/^https:\/\/[a-z0-9.-]+$/i.test(url)) { store.authError = 'La dirección debe ser como https://xxxxxxxx.supabase.co'; render(); return; }
-    if (/service_role|sb_secret_/i.test(key)) { store.authError = 'Esa es una clave secreta. Use la clave pública (anon o publishable).'; render(); return; }
+    if (!key) { store.authError = 'Falta la clave pública. Empieza por sb_publishable_'; render(); return; }
     try { localStorage.setItem(CFG_KEY, JSON.stringify({ url: url, key: key })); } catch (err3) { /* se usa solo en esta sesión */ }
     connect({ url: url, key: key }); return;
   }
@@ -1269,6 +1272,31 @@ document.addEventListener('submit', function (e) {
 });
 
 function g0() { var g = $('#gate'); if (g) g.dataset.sig = ''; render(); }
+/* Toma la dirección y la clave pública de lo que se pegue, aunque venga la línea completa de Supabase
+   (por ejemplo NEXT_PUBLIC_SUPABASE_URL=https://… o las dos líneas juntas). */
+function jwtRole(t) { try { var p = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); while (p.length % 4) p += '='; return JSON.parse(atob(p)).role || ''; } catch (e) { return ''; } }
+function parseConn(a, b) {
+  a = String(a || ''); b = String(b || ''); var all = a + '\n' + b;
+  var reUrl = /https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+/i, mu = a.match(reUrl) || b.match(reUrl);
+  var reKey = /sb_publishable_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
+  var keys = (b.match(reKey) || []).concat(a.match(reKey) || []);
+  var pub = keys.filter(function (k) { return k.indexOf('sb_publishable_') === 0 || jwtRole(k) !== 'service_role'; })[0] || '';
+  var key = pub;
+  if (!key && !keys.length) { key = b.replace(/^\s*[A-Za-z0-9_]+\s*=\s*/, '').replace(/["'\s]/g, ''); if (/^https?:/i.test(key)) key = ''; }
+  var secret = !pub && (/sb_secret_/i.test(all) || /service_role/i.test(b) || keys.length > 0);
+  return { url: mu ? mu[0] : a.trim().replace(/\/+$/, ''), key: key, secret: secret };
+}
+document.addEventListener('paste', function (e) {
+  var f = e.target && e.target.closest ? e.target.closest('#form-setup') : null; if (!f) return;
+  var txt = ''; try { txt = (e.clipboardData || window.clipboardData).getData('text') || ''; } catch (err) { return; }
+  if (!txt) return;
+  var pc = e.target.name === 'url' ? parseConn(txt, '') : parseConn('', txt);
+  var gotUrl = /^https:\/\/[a-z0-9.-]+$/i.test(pc.url), gotKey = /^(sb_publishable_|eyJ)/.test(pc.key);
+  if (pc.secret || (!gotUrl && !gotKey)) return;
+  e.preventDefault();
+  if (gotUrl) f.elements.url.value = pc.url;
+  if (gotKey) f.elements.key.value = pc.key;
+});
 function addKeywords(raw) {
   raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (k) { if (ui.draftKeywords.length < 25 && !ui.draftKeywords.some(function (x) { return normalize(x) === normalize(k); })) ui.draftKeywords.push(k.slice(0, 50)); });
   refreshKeywords();
