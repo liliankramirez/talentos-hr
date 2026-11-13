@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>TalentOS HR</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  if (window.tailwind) {
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], display: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'] } } } };
+  }
+</script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; background: #F8FAFC; color: #1E293B; }
+  h1, h2, h3, .font-display { font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif; }
+  .card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .tnum { font-variant-numeric: tabular-nums; }
+  .kcol.drag-over { background: #EEF2FF; outline: 2px dashed #4F46E5; outline-offset: -2px; }
+  .kcard.dragging { opacity: .45; }
+  .gauge-ring { transition: stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1); }
+  .spin { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .fade-in { animation: fadeIn .25s ease-out both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 8px; }
+  .dropzone.is-over { border-color: #4F46E5; background: #EEF2FF; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid #4F46E5; outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  #view .card, #view section { min-width: 0; }
+  @media (prefers-reduced-motion: reduce) { .gauge-ring, .fade-in, .spin { animation: none; transition: none; } }
+</style>
+</head>
+<body>
+
+<div id="backdrop" class="fixed inset-0 z-30 bg-slate-900/50 lg:hidden" hidden></div>
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col bg-slate-900 text-slate-300 transition-transform duration-200 lg:translate-x-0">
+  <div class="flex items-center gap-3 px-5 py-5">
+    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white"><i data-lucide="sparkles" class="h-5 w-5"></i></div>
+    <div>
+      <p class="font-display text-[15px] font-bold leading-tight text-white">TalentOS HR</p>
+      <p class="text-[11px] text-slate-400">Selección · Contratación · Rotación</p>
+    </div>
+  </div>
+  <nav id="nav" class="scroll-thin mt-1 flex-1 space-y-1 overflow-y-auto px-3" aria-label="Módulos"></nav>
+  <div id="side-foot" class="border-t border-slate-800 p-3"></div>
+</aside>
+
+<div class="flex min-h-screen flex-col lg:pl-64">
+  <header class="sticky z-20 border-b border-slate-200 bg-white/90 backdrop-blur" style="top:0">
+    <div class="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+      <button data-action="toggle-sidebar" class="rounded-lg border border-slate-200 p-2 text-slate-600 lg:hidden" aria-label="Abrir menú"><i data-lucide="menu" class="h-4 w-4"></i></button>
+      <div class="relative min-w-0 flex-1 basis-56">
+        <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+        <input id="global-search" type="search" autocomplete="off" placeholder="Buscar candidatos, vacantes o colaboradores…" aria-label="Buscador global" class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm placeholder:text-slate-400 focus:bg-white">
+        <div id="search-results" class="card absolute left-0 right-0 top-full z-30 mt-2 max-h-80 overflow-y-auto p-1.5" hidden></div>
+      </div>
+      <div id="quick-filters" class="flex flex-wrap items-center gap-1.5" aria-label="Filtros rápidos"></div>
+      <div class="relative ml-auto">
+        <button data-action="toggle-notif" class="relative rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" aria-label="Centro de alertas">
+          <i data-lucide="bell" class="h-5 w-5"></i>
+          <span id="notif-count" class="tnum absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white" hidden></span>
+        </button>
+        <div id="notif-panel" class="card absolute right-0 top-full z-30 mt-2 w-[min(92vw,400px)] overflow-hidden" hidden></div>
+      </div>
+    </div>
+  </header>
+  <main id="view" class="flex-1 px-4 py-6 sm:px-6"></main>
+</div>
+
+<div id="gate" class="fixed inset-0 z-[70] overflow-y-auto bg-slate-50" hidden></div>
+<div id="modal-root"></div>
+<div id="toasts" class="pointer-events-none fixed bottom-5 right-5 z-[60] flex w-[min(92vw,360px)] flex-col gap-2"></div>
+
+<script>
+(function () {
+'use strict';
+
+/* =====================================================================
+   1. CONSTANTES Y UTILIDADES
+   ===================================================================== */
+var STORAGE_KEY = 'talentos_hr_app_v1';
+var STAGES = ['Postulación', 'Preselección', 'Entrevista', 'Pruebas', 'Aprobación', 'Contratación', 'Cierre'];
+var SLA_DEFAULT = [2, 3, 5, 4, 2, 3]; /* 0-4: días por etapa; 5: días máximos sin avance en contratación */
+var SOURCES = ['Portal de empleo', 'Referidos', 'Servicio Público de Empleo', 'Redes sociales', 'Volanteo', 'LinkedIn', 'Headhunting'];
+var AREAS = ['Producción', 'Logística', 'Distribución', 'Administración'];
+var TYPES = ['Operativo', 'Administrativo / Estratégico'];
+var SHIFTS = ['Mañana', 'Tarde', 'Noche', 'Diurno', 'Por asignar'];
+var EXIT_REASONS = ['Mejor oferta salarial', 'Horarios / Turnos', 'Clima / Liderazgo', 'Ubicación / Transporte', 'Abandono de cargo', 'Terminación de contrato'];
+var HIRE_STEPS = [
+  { t: 'Oferta aceptada', s: 'Oferta' },
+  { t: 'Exámenes médicos ocupacionales', s: 'Exámenes' },
+  { t: 'Verificación de referencias y antecedentes', s: 'Referencias' },
+  { t: 'Afiliaciones a seguridad social (EPS, ARL, Caja, Pensión)', s: 'Afiliaciones' },
+  { t: 'Firma de contrato y dotación entregada', s: 'Contrato y dotación' }
+];
+var OP_BANK = ['Turnos rotativos', 'Montacargas', 'BPM', 'SST', 'Trabajo en equipo', 'Bachiller', 'Disponibilidad inmediata', 'Manipulación de alimentos', 'Picking', 'Inventarios', 'Cargue y descargue', 'Licencia C2', 'Trabajo en alturas', 'Cuarto frío'];
+var RET_CHECKS = [
+  { k: 'd15', day: 15, t: 'Día 1 a 15', s: 'Aterrizaje y padrino' },
+  { k: 'd30', day: 30, t: 'Día 30', s: 'Pulso temprano' },
+  { k: 'd60', day: 60, t: 'Día 60', s: 'Feedback del supervisor' },
+  { k: 'd90', day: 90, t: 'Día 90', s: 'Consolidación' }
+];
+var MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+var AVATAR_TONES = ['bg-indigo-100 text-indigo-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-sky-100 text-sky-700', 'bg-rose-100 text-rose-700', 'bg-violet-100 text-violet-700'];
+var VIEW_TITLES = { dashboard: 'Dashboard', vacantes: 'Vacantes', pipeline: 'Pipeline', evaluador: 'Evaluador IA', contratacion: 'Seguimiento de Contratación', rotacion: 'Rotación y Retención', copiloto: 'Copiloto IA' };
+
+function $(sel, root) { return (root || document).querySelector(sel); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function pad(n) { return String(n).padStart(2, '0'); }
+function toISO(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function today() { return toISO(new Date()); }
+function dayNum(iso) { var p = String(iso || '').split('-').map(Number); return Math.round(Date.UTC(p[0], (p[1] || 1) - 1, p[2] || 1) / 864e5); }
+function addDays(iso, n) { var d = new Date((dayNum(iso) + n) * 864e5); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+function daysBetween(a, b) { return dayNum(b) - dayNum(a); }
+function fmtDate(iso) { if (!iso) return '—'; var p = iso.split('-').map(Number); return p[2] + ' ' + MONTHS[p[1] - 1] + ' ' + p[0]; }
+function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+function money(n) { return '$' + Math.round(n).toLocaleString('es-CO'); }
+function nf(n) { return Number(n).toLocaleString('es-CO'); }
+function pct(a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; }
+function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function initials(name) { var w = String(name || '?').replace(/\s+Demo$/, '').trim().split(/\s+/); return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase(); }
+function tone(name) { var h = 0, s = String(name || ''); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return AVATAR_TONES[h % AVATAR_TONES.length]; }
+function slug(name) { return String(name).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z\s]/g, '').trim().replace(/\s+/g, '.'); }
+function ic(name, cls) { return '<i data-lucide="' + name + '" class="' + (cls || 'h-4 w-4') + '"></i>'; }
+function icons() { if (window.lucide && lucide.createIcons) { try { lucide.createIcons(); } catch (e) { /* sin iconos */ } } }
+function avatar(name, size) { return '<span class="flex ' + (size || 'h-9 w-9 text-xs') + ' flex-none items-center justify-center rounded-full font-semibold ' + tone(name) + '">' + esc(initials(name)) + '</span>'; }
+function options(list, selected) { return list.map(function (o) { var v = Array.isArray(o) ? o[0] : o, t = Array.isArray(o) ? o[1] : o; return '<option value="' + esc(v) + '"' + (String(v) === String(selected) ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join(''); }
+function countBy(list, fn) { var m = {}; list.forEach(function (x) { var k = fn(x); m[k] = (m[k] || 0) + 1; }); return m; }
+function topKey(map) { var ks = Object.keys(map); if (!ks.length) return null; ks.sort(function (a, b) { return map[b] - map[a]; }); return { key: ks[0], n: map[ks[0]], tie: ks.length > 1 && map[ks[1]] === map[ks[0]] }; }
+
+/* =====================================================================
+   2. DATOS DEMO Y PERSISTENCIA
+   ===================================================================== */
+function buildHistory(created, stage, since, outcome) {
+  var span = Math.max(0, daysBetween(created, since)), list = [];
+  for (var i = 0; i <= stage; i++) list.push({ stage: i, date: i === stage ? since : addDays(created, stage ? Math.round(span * i / stage) : 0), note: i === 0 ? 'Postulación recibida' : (i === 6 && outcome ? 'Cierre: ' + outcome : '') });
+  return list;
+}
+function seed() {
+  var t = today();
+  function ago(n) { return addDays(t, -n); }
+  var vacancies = [
+    { id: 'v1', title: 'Operario de Planta y Empaque', type: 'Operativo', area: 'Producción', slots: 12, filledBase: 7, description: 'Empaque, pesaje y rotulado de producto en línea de producción. Alistamiento de pedidos y limpieza del puesto según el plan de saneamiento.', keywords: ['BPM', 'Manipulación de alimentos', 'Empaque', 'Turnos rotativos', 'Trabajo en equipo', 'Bachiller', 'SST', 'Disponibilidad inmediata'], openDate: ago(18), deadline: addDays(t, 12), startDate: addDays(t, 5), recruiter: 'Laura Méndez (demo)', status: 'Activa' },
+    { id: 'v2', title: 'Auxiliar Logístico y Picking', type: 'Operativo', area: 'Logística', slots: 8, filledBase: 3, description: 'Alistamiento y verificación de pedidos, control de inventario, cargue y descargue en el centro de distribución.', keywords: ['Picking', 'Inventarios', 'Montacargas', 'Cargue y descargue', 'WMS', 'Turnos rotativos', 'SST', 'Bachiller', 'Trabajo en equipo'], openDate: ago(14), deadline: addDays(t, 16), startDate: addDays(t, 12), recruiter: 'Andrés Rojas (demo)', status: 'Activa' },
+    { id: 'v3', title: 'Conductor Entregador', type: 'Operativo', area: 'Distribución', slots: 5, filledBase: 1, description: 'Entrega de producto a clientes en ruta urbana, verificación de documentos y recaudo, cuidado del vehículo.', keywords: ['Licencia C2', 'Reparto', 'Rutas', 'Entregas', 'Cadena de frío', 'Recaudo', 'Servicio al cliente', 'Disponibilidad inmediata'], openDate: ago(25), deadline: addDays(t, 3), startDate: addDays(t, 6), recruiter: 'Andrés Rojas (demo)', status: 'Activa' },
+    { id: 'v4', title: 'Supervisor de Operaciones', type: 'Administrativo / Estratégico', area: 'Producción', slots: 1, filledBase: 0, description: 'Lidera el turno de producción, programa al personal, responde por los indicadores de la línea y por el cumplimiento de BPM y SST.', keywords: ['Liderazgo de equipos', 'Indicadores de producción', 'BPM', 'Programación de turnos', 'Excel avanzado', 'Mejora continua', 'SST', 'Manejo de personal'], openDate: ago(30), deadline: ago(4), startDate: addDays(t, 20), recruiter: 'Carolina Vega (demo)', status: 'Activa' },
+    { id: 'v5', title: 'Analista de Nómina', type: 'Administrativo / Estratégico', area: 'Administración', slots: 1, filledBase: 0, description: 'Liquida la nómina, la seguridad social y las prestaciones; registra novedades y atiende requerimientos de los colaboradores.', keywords: ['Nómina', 'Seguridad social', 'PILA', 'Liquidación de prestaciones', 'Excel avanzado', 'Legislación laboral', 'Novedades de nómina', 'Nómina electrónica'], openDate: ago(9), deadline: addDays(t, 25), startDate: addDays(t, 30), recruiter: 'Laura Méndez (demo)', status: 'Activa' }
+  ];
+  var n = 0;
+  function mk(name, vac, stage, inStage, created, match, source, notes, outcome) {
+    n++; var since = ago(inStage), cr = ago(created);
+    return { id: 'c' + n, name: name + ' Demo', email: slug(name) + '@ejemplo.com', phone: '+57 300 555 01' + pad(n), source: source, notes: notes || '', vacancyId: vac, stage: stage, stageSince: since, match: match, createdAt: cr, outcome: outcome || null, consent: true, history: buildHistory(cr, stage, since, outcome), notesLog: [], hiring: null };
+  }
+  var candidates = [
+    mk('Yeison Martínez', 'v1', 2, 7, 12, 81, 'Referidos', 'Pendiente agenda del supervisor para la entrevista.'),
+    mk('Luz Marina Cárdenas', 'v1', 1, 1, 3, 75, 'Portal de empleo', 'Experiencia en empaque; validar turnos.'),
+    mk('Brayan Stiven López', 'v1', 0, 0, 0, null, 'Redes sociales', ''),
+    mk('Sandra Patricia Gómez', 'v1', 3, 6, 14, 88, 'Referidos', 'Prueba práctica sin calificar.'),
+    mk('Kevin Andrés Torres', 'v2', 1, 5, 8, 63, 'Redes sociales', 'Hoja de vida sin revisar por carga del equipo.'),
+    mk('Diana Marcela Ruiz', 'v2', 4, 1, 15, 86, 'Portal de empleo', 'Aprobada por el jefe de bodega.'),
+    mk('Jhon Alexander Peña', 'v2', 0, 4, 4, null, 'Servicio Público de Empleo', 'Postulación sin primer contacto.'),
+    mk('Óscar Javier Niño', 'v3', 2, 2, 9, 79, 'Portal de empleo', 'Licencia C2 vigente.'),
+    mk('Fabián Castillo', 'v3', 6, 8, 18, 38, 'Redes sociales', 'No acredita la categoría de licencia requerida.', 'No seleccionado'),
+    mk('Carolina Vargas', 'v4', 2, 3, 12, 84, 'LinkedIn', 'Entrevista por competencias programada.'),
+    mk('Andrés Felipe Mora', 'v4', 3, 1, 20, 90, 'Headhunting', 'Caso práctico de programación de turnos enviado.'),
+    mk('Paola Andrea Suárez', 'v5', 1, 2, 6, 71, 'LinkedIn', 'Experiencia en PILA; validar nómina electrónica.')
+  ];
+  function hire(name, vac, startIn, created, source, match, stepsAgo, contactNote) {
+    var entered = Math.max.apply(null, stepsAgo.filter(function (x) { return x != null; }).concat([0]));
+    var c = mk(name, vac, 5, entered, created, match, source, 'En legalización de ingreso.');
+    c.hiring = { startDate: addDays(t, startIn), enteredAt: ago(entered), steps: stepsAgo.map(function (a) { return { done: a != null, date: a != null ? ago(a) : '' }; }), contacts: contactNote ? [{ date: ago(4), note: contactNote }] : [] };
+    return c;
+  }
+  candidates.push(
+    hire('María Fernanda Rojas', 'v1', 5, 19, 'Referidos', 87, [8, 5, 3, 1, null]),
+    hire('Wilson Ardila', 'v1', 5, 17, 'Portal de empleo', 74, [6, null, null, null, null], 'No contestó; se dejó mensaje por WhatsApp.'),
+    hire('Leidy Tatiana Pérez', 'v1', 5, 21, 'Referidos', 92, [9, 7, 5, 3, 1]),
+    hire('Jorge Eliécer Ramírez', 'v2', 12, 18, 'Servicio Público de Empleo', 69, [7, null, 5, null, null]),
+    hire('Camilo Andrés Díaz', 'v3', 6, 15, 'Portal de empleo', 83, [4, 2, null, null, null]),
+    hire('Natalia Herrera', 'v2', 12, 16, 'Redes sociales', 78, [6, 4, 1, null, null])
+  );
+  var m = 0;
+  function emp(name, role, area, type, shift, hiredAgo, appliedAgo, exit) {
+    m++;
+    var e = { id: 'e' + m, name: name + ' Demo', role: role, area: area, type: type, shift: shift, hireDate: ago(hiredAgo), appliedAt: appliedAgo ? ago(appliedAgo) : '', status: 'Activo', exitDate: '', exitType: '', exitReason: '', exitNotes: '', vacancyId: '', fromHiring: false, retention: null };
+    if (exit) { e.status = 'Retirado'; e.exitDate = ago(exit[0]); e.exitType = exit[1]; e.exitReason = exit[2]; e.exitNotes = exit[3]; }
+    return e;
+  }
+  var employees = [
+    emp('Rosa Elena Vargas', 'Operaria de planta', 'Producción', 'Operativo', 'Mañana', 900),
+    emp('Luis Alberto Cano', 'Operario de planta', 'Producción', 'Operativo', 'Mañana', 760),
+    emp('Marleny Ortiz', 'Operaria de empaque', 'Producción', 'Operativo', 'Tarde', 640),
+    emp('Édgar Buitrago', 'Operario de planta', 'Producción', 'Operativo', 'Noche', 480),
+    emp('Yuli Andrea Ramos', 'Operaria de empaque', 'Producción', 'Operativo', 'Tarde', 300),
+    emp('Duván Felipe Sierra', 'Operario de planta', 'Producción', 'Operativo', 'Noche', 120),
+    emp('Angie Lorena Muñoz', 'Operaria de empaque', 'Producción', 'Operativo', 'Mañana', 40, 58),
+    emp('Cristian Camilo Vega', 'Operario de planta', 'Producción', 'Operativo', 'Noche', 21, 36),
+    emp('Gloria Inés Parra', 'Supervisora de producción', 'Producción', 'Administrativo / Estratégico', 'Mañana', 540),
+    emp('Héctor Fabio Lozano', 'Auxiliar logístico', 'Logística', 'Operativo', 'Mañana', 410),
+    emp('Jenny Paola Cruz', 'Auxiliar de picking', 'Logística', 'Operativo', 'Tarde', 260),
+    emp('Stiven Alejandro Gil', 'Auxiliar logístico', 'Logística', 'Operativo', 'Noche', 180),
+    emp('Miguel Ángel Rincón', 'Montacarguista', 'Logística', 'Operativo', 'Tarde', 95),
+    emp('Tatiana Molina', 'Auxiliar de picking', 'Logística', 'Operativo', 'Mañana', 12, 30),
+    emp('Jairo Enrique Salazar', 'Conductor entregador', 'Distribución', 'Operativo', 'Mañana', 365),
+    emp('William Bermúdez', 'Conductor entregador', 'Distribución', 'Operativo', 'Mañana', 210),
+    emp('Nelson Darío Pinto', 'Auxiliar de reparto', 'Distribución', 'Operativo', 'Tarde', 60, 80),
+    emp('Claudia Patricia Mejía', 'Coordinadora administrativa', 'Administración', 'Administrativo / Estratégico', 'Diurno', 150),
+    emp('Jefferson Ruiz', 'Operario de planta', 'Producción', 'Operativo', 'Noche', 55, 0, [10, 'Voluntario', 'Horarios / Turnos', 'El turno de noche fijo no le permitía cuidar a su familia. Dice que en selección entendió que rotaría.']),
+    emp('Karen Dayana López', 'Auxiliar de picking', 'Logística', 'Operativo', 'Noche', 130, 0, [62, 'Voluntario', 'Horarios / Turnos', 'Sale a las 6 a. m. sin transporte cercano; pidió cambio de turno y no hubo cupo.']),
+    emp('Arley Montoya', 'Operario de planta', 'Producción', 'Operativo', 'Noche', 420, 0, [25, 'Voluntario', 'Mejor oferta salarial', 'Recibió oferta con mejor salario y turno fijo de día.']),
+    emp('Rubén Darío Acosta', 'Conductor entregador', 'Distribución', 'Operativo', 'Mañana', 300, 0, [95, 'Involuntario', 'Abandono de cargo', 'No se presentó durante tres días consecutivos; se adelantó el debido proceso.']),
+    emp('Martha Lucía Peña', 'Auxiliar administrativa', 'Administración', 'Administrativo / Estratégico', 'Diurno', 700, 0, [140, 'Involuntario', 'Terminación de contrato', 'Vencimiento del contrato a término fijo.'])
+  ];
+  return { vacancies: vacancies, candidates: candidates, employees: employees, sla: SLA_DEFAULT.slice(), costs: { op: 2500000, adm: 6000000 }, read: [], demo: true };
+}
+function emptyState() { return { vacancies: [], candidates: [], employees: [], sla: SLA_DEFAULT.slice(), costs: { op: 2500000, adm: 6000000 }, read: [], demo: false }; }
+function validState(d) { return !!d && Array.isArray(d.vacancies) && Array.isArray(d.candidates) && Array.isArray(d.employees); }
+function normalizeState(d) {
+  var e = emptyState();
+  d.sla = Array.isArray(d.sla) && d.sla.length === 6 ? d.sla : e.sla; d.costs = d.costs && typeof d.costs === 'object' ? d.costs : e.costs; d.read = Array.isArray(d.read) ? d.read : []; d.demo = !!d.demo;
+  d.vacancies.forEach(function (v) { v.keywords = Array.isArray(v.keywords) ? v.keywords : []; });
+  d.candidates.forEach(function (c) {
+    c.history = Array.isArray(c.history) && c.history.length ? c.history : [{ stage: c.stage || 0, date: c.stageSince || today(), note: '' }]; c.notesLog = Array.isArray(c.notesLog) ? c.notesLog : [];
+    if (c.stage === 5 && !c.hiring) { var v0 = d.vacancies.find(function (v) { return v.id === c.vacancyId; }); c.hiring = { startDate: v0 && v0.startDate ? v0.startDate : addDays(today(), 10), enteredAt: c.stageSince || today(), steps: HIRE_STEPS.map(function () { return { done: false, date: '' }; }), contacts: [] }; }
+  });
+  return d;
+}
+/* Conexión con Supabase. Opcional: escriba aquí la dirección del proyecto y la clave pública (anon / publishable)
+   para no tener que ingresarlas en cada equipo. Nunca use la clave "service_role". */
+var SUPABASE_URL = '';
+var SUPABASE_KEY = '';
+var CFG_KEY = 'talentos_hr_supabase', TABLE = 'talentos_docs';
+var CHUNK = 40, COLS = ['vacancies', 'candidates', 'employees'];
+var store = { mode: 'loading', sb: null, uid: null, email: '', cache: {}, queue: Promise.resolve(), pending: 0, failed: false, slow: false, authError: '' };
+function getCfg() {
+  if (SUPABASE_URL && SUPABASE_KEY) return { url: SUPABASE_URL, key: SUPABASE_KEY, fixed: true };
+  try { var c = JSON.parse(localStorage.getItem(CFG_KEY) || 'null'); return c && c.url && c.key ? c : null; } catch (e) { return null; }
+}
+function chunkDocs() {
+  var out = { meta: JSON.stringify({ app: 'TalentOS HR', sla: state.sla, costs: state.costs, read: state.read, demo: !!state.demo }) };
+  COLS.forEach(function (col) { for (var i = 0; i < state[col].length; i += CHUNK) out[col + '/p' + (i / CHUNK)] = JSON.stringify({ items: state[col].slice(i, i + CHUNK) }); });
+  return out;
+}
+function checked(r) { if (r && r.error) throw r.error; return r; }
+function writeDoc(key, json) {
+  var t = store.sb.from(TABLE);
+  if (json == null) return t.delete().eq('user_id', store.uid).eq('key', key).then(checked);
+  return t.upsert({ user_id: store.uid, key: key, data: JSON.parse(json), updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' }).then(checked);
+}
+function saveStatusText() { return store.mode !== 'remote' ? 'Sin conexión' : (store.pending ? 'Guardando…' : (store.failed ? 'Hay cambios sin guardar' : 'Guardado')); }
+function updateSaveStatus() { var el = $('#save-status'); if (el) el.textContent = saveStatusText(); }
+function save() {
+  if (store.mode !== 'remote') return;
+  var docs = chunkDocs(), jobs = [];
+  Object.keys(docs).forEach(function (k) { if (store.cache[k] !== docs[k]) jobs.push([k, docs[k]]); });
+  Object.keys(store.cache).forEach(function (k) { if (!(k in docs)) jobs.push([k, null]); });
+  jobs.forEach(function (j) {
+    if (j[1] == null) delete store.cache[j[0]]; else store.cache[j[0]] = j[1];
+    store.pending++;
+    store.queue = store.queue.then(function () { return writeDoc(j[0], j[1]); }).then(function () { store.failed = false; }, function () {
+      if (j[1] == null) store.cache[j[0]] = '~'; else if (store.cache[j[0]] === j[1]) delete store.cache[j[0]];
+      if (!store.failed) toast('No se pudo guardar el último cambio. Revise la conexión: se reintentará con el siguiente cambio.', 'warn');
+      store.failed = true;
+    }).then(function () { store.pending--; updateSaveStatus(); });
+  });
+  updateSaveStatus();
+}
+function boot() {
+  render();
+  if (!window.supabase || !window.supabase.createClient) { store.mode = 'error'; store.authError = 'No se pudo cargar el componente de conexión. Revise su internet y recargue la página.'; render(); return; }
+  var cfg = getCfg();
+  if (!cfg) { store.mode = 'setup'; render(); return; }
+  connect(cfg);
+}
+function connect(cfg) {
+  try { store.sb = window.supabase.createClient(cfg.url, cfg.key); }
+  catch (e) { store.mode = 'setup'; store.authError = 'La dirección del proyecto o la clave no son válidas.'; render(); return; }
+  store.mode = 'loading'; store.authError = ''; render();
+  store.sb.auth.getSession().then(function (r) {
+    var session = r && r.data && r.data.session;
+    if (session) return enter(session);
+    store.mode = 'login'; render();
+  }).catch(function () { store.mode = 'login'; store.authError = 'No se pudo conectar con Supabase. Revise la dirección del proyecto.'; render(); });
+}
+function enter(session) {
+  store.uid = session.user.id; store.email = session.user.email || ''; store.mode = 'loading'; store.authError = ''; store.slow = false; render();
+  var slowTimer = setTimeout(function () { if (store.mode === 'loading') { store.slow = true; render(); } }, 10000);
+  return store.sb.from(TABLE).select('key,data').then(checked).then(function (r) {
+    clearTimeout(slowTimer);
+    var rows = r.data || [], meta = null, d = {};
+    rows.forEach(function (x) { if (x.key === 'meta') meta = x.data || {}; });
+    COLS.forEach(function (col) {
+      var parts = rows.filter(function (x) { return String(x.key).indexOf(col + '/p') === 0; }).map(function (x) { return { n: Number(String(x.key).split('/p')[1]) || 0, items: (x.data && x.data.items) || [] }; }).sort(function (a, b) { return a.n - b.n; });
+      d[col] = [].concat.apply([], parts.map(function (p) { return p.items; }));
+    });
+    if (meta) { d.sla = meta.sla; d.costs = meta.costs; d.read = meta.read; d.demo = meta.demo; }
+    state = normalizeState(d); store.mode = 'remote'; store.failed = false;
+    store.cache = meta ? chunkDocs() : {};
+    render();
+    if (!meta) save();
+  }).catch(function (e) {
+    clearTimeout(slowTimer);
+    var msg = ((e && e.message) || '') + ' ' + ((e && e.code) || '');
+    store.mode = 'error';
+    store.authError = /talentos_docs|schema cache|PGRST205|42P01|does not exist/i.test(msg) ? 'Su proyecto de Supabase aún no tiene la tabla de TalentOS HR. Ejecute el código SQL de instalación en Supabase y vuelva a intentar.' : 'No se pudieron cargar los datos. Revise su conexión y vuelva a intentar.';
+    render();
+  });
+}
+function renderGate() {
+  var g = $('#gate'); if (!g) return;
+  if (store.mode === 'remote') { g.hidden = true; g.innerHTML = ''; g.dataset.sig = ''; return; }
+  var sig = store.mode + '|' + store.authError + '|' + store.slow;
+  if (g.dataset.sig !== sig) {
+    var cfg = getCfg();
+    var err = store.authError ? '<p class="mb-4 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">' + ic('alert-triangle', 'mt-0.5 h-4 w-4 flex-none') + '<span>' + esc(store.authError) + '</span></p>' : '';
+    var inner;
+    if (store.mode === 'loading') inner = '<div class="flex flex-col items-center py-6 text-center"><span class="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">' + ic('loader-2', 'spin h-6 w-6') + '</span><p class="mt-3 text-sm font-semibold text-slate-800">Cargando sus datos…</p>' + (store.slow ? '<p class="mt-1 text-xs text-slate-500">La conexión tarda más de lo normal. No cierre la página.</p>' : '') + '</div>';
+    else if (store.mode === 'setup') inner = err + '<form id="form-setup" class="space-y-4"><p class="text-sm text-slate-600">Conecte esta página con su proyecto de Supabase. Solo se hace una vez en cada equipo.</p>' +
+      field('Dirección del proyecto (Project URL)', '<input name="url" type="url" required placeholder="https://xxxxxxxx.supabase.co" autocomplete="off" class="' + INPUT + '">') +
+      field('Clave pública (anon o publishable)', '<textarea name="key" rows="3" required autocomplete="off" spellcheck="false" placeholder="eyJ… o sb_publishable_…" class="' + INPUT + ' font-mono text-xs"></textarea>') +
+      '<p class="text-[11px] leading-relaxed text-slate-500">Las encuentra en Supabase, en Project Settings → API. Use la clave pública; nunca la clave "service_role" o "secret".</p><button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('plug') + 'Conectar</button></form>';
+    else if (store.mode === 'login') inner = err + '<form id="form-login" class="space-y-4">' + field('Correo', '<input name="email" type="email" required autocomplete="username" class="' + INPUT + '">') + field('Clave', '<input name="password" type="password" required autocomplete="current-password" class="' + INPUT + '">') + '<button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('log-in') + 'Ingresar</button></form>' + (cfg && !cfg.fixed ? '<button data-action="reset-cfg" class="mt-4 w-full text-center text-xs text-slate-400 hover:text-slate-600">Cambiar el proyecto de Supabase</button>' : '');
+    else inner = err + '<div class="flex flex-wrap gap-2"><button data-action="retry" class="' + BTN_PRI + ' flex-1">' + ic('refresh-cw') + 'Reintentar</button>' + (store.sb ? '<button data-action="logout" class="' + BTN_SEC + ' flex-1">Cerrar sesión</button>' : '') + '</div>';
+    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div></div>' + inner + '</div></div>';
+    g.dataset.sig = sig; icons();
+  }
+  g.hidden = false;
+}
+function isEmpty() { return !state.vacancies.length && !state.candidates.length && !state.employees.length; }
+function areaList() {
+  var seen = {}, out = [];
+  AREAS.concat(state.vacancies.map(function (v) { return v.area; }), state.employees.map(function (e) { return e.area; })).forEach(function (a) { a = String(a || '').trim(); var k = a.toLowerCase(); if (a && !seen[k]) { seen[k] = 1; out.push(a); } });
+  return out;
+}
+function newEmp(name, role, area, type, shift, hireDate) { return { id: uid('e'), name: name, role: role, area: area, type: type, shift: shift, hireDate: hireDate, appliedAt: '', status: 'Activo', exitDate: '', exitType: '', exitReason: '', exitNotes: '', vacancyId: '', fromHiring: false, retention: null }; }
+function parseDate(s) {
+  s = String(s || '').trim(); var m, y, mo, d;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else if ((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/))) { y = +m[3]; mo = +m[2]; d = +m[1]; }
+  else return '';
+  return mo >= 1 && mo <= 12 && d >= 1 && d <= 31 && y >= 1950 ? y + '-' + pad(mo) + '-' + pad(d) : '';
+}
+function freshEv() { return { vacId: '', text: '', fileName: '', pages: 0, status: 'idle', step: 0, result: null, error: '' }; }
+function freshCop() { return { focus: 'todos', budget: 0, status: 'idle', step: 0, plan: null, target: null }; }
+
+var state = emptyState();
+var ui = { view: 'dashboard', vacSearch: '', vacStatus: '', vacType: '', pipeVac: '', filters: { overdue: false, high: false, unscored: false }, ev: freshEv(), cop: freshCop(), draftKeywords: [], notifOpen: false, dirStatus: '', dirArea: '' };
+var charts = {};
+
+/* =====================================================================
+   3. REGLAS DE NEGOCIO
+   ===================================================================== */
+function vacById(id) { return state.vacancies.find(function (v) { return v.id === id; }); }
+function candById(id) { return state.candidates.find(function (c) { return c.id === id; }); }
+function empById(id) { return state.employees.find(function (e) { return e.id === id; }); }
+function isOp(x) { return x && x.type === 'Operativo'; }
+
+/* --- Selección: SLA por etapa (0 a 4) --- */
+function slaInfo(c) {
+  if (c.stage >= 5) return null;
+  var days = Math.max(0, daysBetween(c.stageSince, today())), limit = Number(state.sla[c.stage]) || 0, over = days - limit;
+  return { days: days, limit: limit, over: over, level: over > 0 ? 'crit' : (over === 0 ? 'warn' : 'ok') };
+}
+function bottlenecks() {
+  return state.candidates.map(function (c) { return { c: c, s: slaInfo(c) }; }).filter(function (x) { return x.s && x.s.level === 'crit'; }).sort(function (a, b) { return b.s.over - a.s.over; });
+}
+
+/* --- Vacantes: plazo, cupos y cobertura --- */
+function vacProgress(v) {
+  var total = Math.max(1, daysBetween(v.openDate, v.deadline)), elapsed = Math.max(0, daysBetween(v.openDate, today())), left = daysBetween(today(), v.deadline);
+  return { pct: Math.min(100, Math.round(elapsed / total * 100)), elapsed: elapsed, total: total, left: left };
+}
+function coverage(v) {
+  var slots = Math.max(1, Number(v.slots) || 1);
+  var covered = Math.min(slots, (Number(v.filledBase) || 0) + state.employees.filter(function (e) { return e.fromHiring && e.vacancyId === v.id; }).length);
+  var hiring = state.candidates.filter(function (c) { return c.vacancyId === v.id && c.stage === 5; }).length;
+  var toStart = v.startDate ? daysBetween(today(), v.startDate) : null, open = slots - covered;
+  var alert = null;
+  if (v.status === 'Activa' && open > 0 && toStart != null && toStart < 7) alert = { level: toStart <= 3 ? 'crit' : 'warn', text: (toStart < 0 ? 'La operación inició hace ' + plural(-toStart, 'día', 'días') : (toStart === 0 ? 'La operación inicia hoy' : 'Inicio de operación en ' + plural(toStart, 'día', 'días'))) + ' · ' + plural(open, 'cupo sin cubrir', 'cupos sin cubrir') };
+  return { slots: slots, covered: covered, open: open, hiring: hiring, pct: Math.round(covered / slots * 100), toStart: toStart, alert: alert };
+}
+
+/* --- Contratación: hitos y riesgo de no presentarse --- */
+function ensureHiring(c) {
+  if (c.hiring) return;
+  var v = vacById(c.vacancyId), t = today();
+  c.hiring = { startDate: v && v.startDate && dayNum(v.startDate) > dayNum(t) ? v.startDate : addDays(t, 10), enteredAt: t, steps: HIRE_STEPS.map(function () { return { done: false, date: '' }; }), contacts: [] };
+}
+function hiringList() { return state.candidates.filter(function (c) { return c.stage === 5 && c.hiring; }); }
+function hiringRisk(c) {
+  var h = c.hiring, t = today(), done = h.steps.filter(function (s) { return s.done; }).length;
+  var toStart = daysBetween(t, h.startDate), last = h.enteredAt;
+  h.steps.forEach(function (s) { if (s.done && s.date && dayNum(s.date) > dayNum(last)) last = s.date; });
+  var idle = Math.max(0, daysBetween(last, t)), limit = Number(state.sla[5]) || 3;
+  var lastContact = h.contacts.length ? h.contacts[h.contacts.length - 1] : null;
+  var out = { done: done, pct: Math.round(done / HIRE_STEPS.length * 100), toStart: toStart, idle: idle, lastContact: lastContact, level: 'ok', label: 'En tiempo', reason: '' };
+  if (done === HIRE_STEPS.length) { out.level = 'ready'; out.label = 'Listo para activar'; return out; }
+  var pendingExam = !h.steps[1].done;
+  if (toStart < 0) { out.level = 'crit'; out.label = 'Ingreso vencido'; out.reason = 'La fecha de ingreso pasó hace ' + plural(-toStart, 'día', 'días') + ' con hitos pendientes'; }
+  else if (idle > limit) { out.level = (idle > limit + 2 || toStart <= 5) ? 'crit' : 'warn'; out.label = 'Riesgo de deserción'; out.reason = 'Sin avance hace ' + plural(idle, 'día', 'días') + (pendingExam ? ' · exámenes médicos pendientes' : ' · documentos pendientes'); }
+  else if (toStart <= 2) { out.level = 'warn'; out.label = 'Ingreso inminente'; out.reason = 'Ingresa ' + (toStart === 0 ? 'hoy' : 'en ' + plural(toStart, 'día', 'días')) + ' con hitos pendientes'; }
+  if (out.level !== 'ok' && lastContact && daysBetween(lastContact.date, t) <= 2 && toStart >= 0) { out.level = 'warn'; out.label = 'En gestión'; out.managed = true; }
+  return out;
+}
+function hiringAtRisk() { return hiringList().map(function (c) { return { c: c, r: hiringRisk(c) }; }).filter(function (x) { return x.r.level === 'crit' || x.r.level === 'warn'; }); }
+function moveCandidate(id, to) {
+  var c = candById(id);
+  if (!c || to < 0 || to > 6 || to === c.stage) return false;
+  var from = c.stage, t = today();
+  if (from === 5 && to === 6) { toast('Desde Contratación el cierre se hace en Seguimiento de Contratación: active el ingreso o registre que desistió.', 'warn'); return false; }
+  if (from === 6 && c.outcome === 'Contratado') { toast('Este candidato ya fue activado como colaborador.', 'warn'); return false; }
+  c.outcome = to === 6 ? 'No seleccionado' : null;
+  if (to === 5) ensureHiring(c);
+  c.history.push({ stage: to, date: t, note: to === 6 ? 'Cierre: No seleccionado' : (to < from ? 'Devuelto desde ' + STAGES[from] : (to === 5 ? 'Aprobado: inicia legalización de ingreso' : '')) });
+  c.stage = to; c.stageSince = t; save();
+  toast(c.name + ' pasa a ' + STAGES[to] + (to === 5 ? '. Ya aparece en Seguimiento de Contratación' : '') + '.', 'ok');
+  return true;
+}
+function activateCandidate(id) {
+  var c = candById(id); if (!c || c.stage !== 5 || !c.hiring) return;
+  if (hiringRisk(c).done < HIRE_STEPS.length) { toast('Faltan hitos por completar antes de activar.', 'warn'); return; }
+  var v = vacById(c.vacancyId), t = today();
+  state.employees.push({ id: uid('e'), name: c.name, role: v ? v.title : 'Sin cargo', area: v ? v.area : 'Producción', type: v ? v.type : 'Operativo', shift: 'Por asignar', hireDate: t, appliedAt: c.createdAt, status: 'Activo', exitDate: '', exitType: '', exitReason: '', exitNotes: '', vacancyId: c.vacancyId, fromHiring: true, retention: null });
+  c.stage = 6; c.stageSince = t; c.outcome = 'Contratado'; c.history.push({ stage: 6, date: t, note: 'Cierre: Contratado · activado en nómina y operación' });
+  save();
+  var cov = v ? coverage(v) : null;
+  toast(c.name + ' quedó activo en la plantilla.' + (cov ? ' ' + v.title + ': ' + cov.covered + ' de ' + cov.slots + ' cupos cubiertos' + (cov.open ? '' : ' (cobertura completa)') + '.' : ''), 'ok');
+}
+
+/* --- Rotación --- */
+function tenure(e) { return Math.max(0, daysBetween(e.hireDate, e.exitDate || today())); }
+function headcount(d, filter) { return state.employees.filter(function (e) { return (!filter || filter(e)) && dayNum(e.hireDate) <= dayNum(d) && (!e.exitDate || dayNum(e.exitDate) > dayNum(d)); }).length; }
+function rotation() {
+  var t = today(), es = state.employees, ms = t.slice(0, 8) + '01', y0 = addDays(t, -365);
+  var exits = es.filter(function (e) { return e.status === 'Retirado' && e.exitDate; });
+  var exM = exits.filter(function (e) { return dayNum(e.exitDate) >= dayNum(ms); });
+  var ex12 = exits.filter(function (e) { return dayNum(e.exitDate) >= dayNum(y0); });
+  var avgM = (headcount(addDays(ms, -1)) + headcount(t)) / 2, avgY = (headcount(y0) + headcount(t)) / 2;
+  var hires12 = es.filter(function (e) { return dayNum(e.hireDate) >= dayNum(y0); });
+  var early12 = hires12.filter(function (e) { return e.exitDate && tenure(e) < 90; });
+  var cost = ex12.reduce(function (a, e) { return a + (isOp(e) ? Number(state.costs.op) : Number(state.costs.adm)); }, 0);
+  var byArea = areaList().map(function (a) {
+    var f = function (e) { return e.area === a; }, n = ex12.filter(f).length, avg = (headcount(y0, f) + headcount(t, f)) / 2;
+    return { area: a, exits: n, rate: avg ? Math.round(n / avg * 1000) / 10 : 0, active: headcount(t, f) };
+  });
+  return { active: headcount(t), exits: exits, exM: exM, ex12: ex12, monthly: avgM ? Math.round(exM.length / avgM * 1000) / 10 : 0, annual: avgY ? Math.round(ex12.length / avgY * 1000) / 10 : 0, avgM: avgM, avgY: avgY, hires12: hires12.length, early12: early12.length, earlyPct: pct(early12.length, hires12.length), cost: cost, byArea: byArea };
+}
+function onboardingList() { return state.employees.filter(function (e) { return e.status === 'Activo' && tenure(e) < 90; }); }
+function retentionState(e) {
+  var d = tenure(e);
+  return RET_CHECKS.map(function (ck) { var done = !!(e.retention && e.retention.checks[ck.k]); return { ck: ck, done: done, late: !done && d > ck.day, due: addDays(e.hireDate, ck.day) }; });
+}
+
+/* --- Alertas e indicadores generales --- */
+function allAlerts() {
+  var list = bottlenecks().map(function (x) {
+    var v = vacById(x.c.vacancyId);
+    return { key: 'c:' + x.c.id + ':' + x.c.stage + ':' + x.c.stageSince, level: 'crit', act: 'open-cand', id: x.c.id, icon: 'user', title: x.c.name, tag: 'Vencido hace ' + plural(x.s.over, 'día', 'días'), text: STAGES[x.c.stage] + ' · límite ' + plural(x.s.limit, 'día', 'días') + (v ? ' · ' + v.title : '') };
+  });
+  hiringAtRisk().forEach(function (x) {
+    list.push({ key: 'h:' + x.c.id + ':' + x.r.done + ':' + x.r.level, level: x.r.level, act: 'nav', view: 'contratacion', icon: 'clipboard-check', title: x.c.name, tag: x.r.label, text: (x.r.reason || 'Legalización de ingreso') + ' · ingresa el ' + fmtDate(x.c.hiring.startDate) });
+  });
+  state.vacancies.forEach(function (v) {
+    if (v.status !== 'Activa') return;
+    var p = vacProgress(v), cov = coverage(v);
+    if (cov.alert) list.push({ key: 's:' + v.id + ':' + v.startDate + ':' + cov.open, level: cov.alert.level, act: 'go-pipeline', id: v.id, icon: 'briefcase', title: v.title, tag: 'Cobertura ' + cov.covered + ' / ' + cov.slots, text: cov.alert.text });
+    if (p.left < 0) list.push({ key: 'v:' + v.id + ':' + v.deadline, level: 'crit', act: 'go-pipeline', id: v.id, icon: 'briefcase', title: v.title, tag: 'Fecha límite vencida', text: 'Debía cerrarse el ' + fmtDate(v.deadline) + ' (hace ' + plural(-p.left, 'día', 'días') + ')' });
+    else if (p.left <= 5) list.push({ key: 'v:' + v.id + ':' + v.deadline, level: 'warn', act: 'go-pipeline', id: v.id, icon: 'briefcase', title: v.title, tag: p.left === 0 ? 'Vence hoy' : 'Faltan ' + plural(p.left, 'día', 'días'), text: 'Fecha límite de contratación: ' + fmtDate(v.deadline) });
+  });
+  return list.sort(function (a, b) { return (a.level === 'crit' ? 0 : 1) - (b.level === 'crit' ? 0 : 1); });
+}
+function kpis() {
+  var cs = state.candidates, recent = state.employees.filter(function (e) { return e.appliedAt && daysBetween(e.hireDate, today()) <= 180; });
+  var tth = recent.length ? Math.round(recent.reduce(function (a, e) { return a + Math.max(0, daysBetween(e.appliedAt, e.hireDate)); }, 0) / recent.length) : null;
+  var reached = cs.filter(function (c) { return c.stage === 5 || (c.stage === 6 && c.outcome === 'Contratado'); }).length;
+  var ops = state.vacancies.filter(function (v) { return v.status === 'Activa' && isOp(v); }).map(coverage);
+  return { active: state.vacancies.filter(function (v) { return v.status === 'Activa'; }).length, tth: tth, hires: recent.length, conv: cs.length ? Math.round(reached / cs.length * 100) : 0, reached: reached, total: cs.length, overdue: bottlenecks().length,
+    opSlots: ops.reduce(function (a, c) { return a + c.slots; }, 0), opCovered: ops.reduce(function (a, c) { return a + c.covered; }, 0) };
+}
+
+/* =====================================================================
+   4. COMPONENTES VISUALES
+   ===================================================================== */
+function matchBadge(m) {
+  if (m == null) return '<span class="tnum inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">Sin evaluar</span>';
+  var cls = m >= 75 ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : (m >= 50 ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-red-50 text-red-700 ring-red-200');
+  return '<span class="tnum inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ' + cls + '" title="Match IA">' + ic('sparkles', 'h-3 w-3') + m + '%</span>';
+}
+function pill(text, level, icon) {
+  var cls = { crit: 'bg-red-50 text-red-700 ring-red-200', warn: 'bg-amber-50 text-amber-700 ring-amber-200', ok: 'bg-slate-100 text-slate-600 ring-slate-200', good: 'bg-emerald-50 text-emerald-700 ring-emerald-200', ready: 'bg-emerald-50 text-emerald-700 ring-emerald-200', info: 'bg-indigo-50 text-indigo-700 ring-indigo-200' }[level || 'ok'];
+  return '<span class="tnum inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ' + cls + '">' + (icon ? ic(icon, 'h-3 w-3') : '') + esc(text) + '</span>';
+}
+function slaBadge(c) {
+  if (c.stage === 6) return pill(c.outcome || 'Cerrado', c.outcome === 'Contratado' ? 'good' : 'ok');
+  if (c.stage === 5 && c.hiring) { var r = hiringRisk(c); return pill(r.done + '/5 hitos', 'info', 'clipboard-check') + (r.level === 'ok' ? '' : ' ' + pill(r.label, r.level, r.level === 'ready' ? 'check' : 'alert-triangle')); }
+  var s = slaInfo(c);
+  if (s.level === 'crit') return pill('Vencido hace ' + plural(s.over, 'día', 'días'), 'crit', 'alert-triangle');
+  if (s.level === 'warn') return pill('Vence hoy', 'warn', 'clock');
+  return pill(plural(s.days, 'día', 'días') + ' de ' + s.limit, 'ok', 'clock');
+}
+function statusBadge(st) {
+  var cls = st === 'Activa' || st === 'Activo' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : (st === 'Pausada' ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-slate-100 text-slate-600 ring-slate-200');
+  return '<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ' + cls + '"><span class="h-1.5 w-1.5 rounded-full bg-current"></span>' + esc(st) + '</span>';
+}
+function typeBadge(type) { return isOp({ type: type }) ? '<span class="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">Operativo</span>' : '<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">Administrativo</span>'; }
+function pageHead(title, sub, actions) {
+  return '<div class="mb-6 flex flex-wrap items-end justify-between gap-3"><div><h1 class="font-display text-2xl font-bold tracking-tight text-slate-900">' + title + '</h1><p class="mt-1 text-sm text-slate-500">' + sub + '</p></div><div class="flex flex-wrap items-center gap-2">' + (actions || '') + '</div></div>';
+}
+function kpi(icon, toneCls, label, value, sub) {
+  return '<div class="card p-5"><div class="flex items-start justify-between gap-2"><p class="text-xs font-medium uppercase tracking-wide text-slate-500">' + label + '</p><span class="flex h-9 w-9 flex-none items-center justify-center rounded-xl ' + toneCls + '">' + ic(icon, 'h-[18px] w-[18px]') + '</span></div><p class="tnum mt-3 font-display text-3xl font-bold text-slate-900">' + value + '</p><p class="mt-1 text-xs text-slate-500">' + sub + '</p></div>';
+}
+function sectionHead(icon, toneCls, title, sub) { return '<div class="flex items-center gap-2.5"><span class="flex h-9 w-9 flex-none items-center justify-center rounded-xl ' + toneCls + '">' + ic(icon, 'h-[18px] w-[18px]') + '</span><div><h2 class="font-display text-base font-bold text-slate-900">' + title + '</h2><p class="text-xs text-slate-500">' + sub + '</p></div></div>'; }
+var BTN = 'inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ';
+var BTN_PRI = BTN + 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700';
+var BTN_SEC = BTN + 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50';
+var BTN_OK = BTN + 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700';
+var BTN_ICON = 'inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-indigo-300 hover:text-indigo-600';
+var INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400';
+var TH = 'whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500';
+function field(label, control, wide) { return '<label class="block ' + (wide ? 'sm:col-span-2' : '') + '"><span class="mb-1 block text-xs font-medium text-slate-600">' + label + '</span>' + control + '</label>'; }
+function toast(msg, kind) {
+  var el = document.createElement('div');
+  var icon = kind === 'ok' ? ic('check-circle-2', 'h-4 w-4 text-emerald-500') : (kind === 'warn' ? ic('alert-triangle', 'h-4 w-4 text-amber-500') : ic('info', 'h-4 w-4 text-indigo-500'));
+  el.className = 'card fade-in pointer-events-auto flex items-start gap-2.5 px-3.5 py-3 text-sm'; el.setAttribute('role', 'status');
+  el.innerHTML = '<span class="mt-0.5">' + icon + '</span><span class="flex-1 text-slate-700">' + esc(msg) + '</span>';
+  $('#toasts').appendChild(el); icons(); setTimeout(function () { el.remove(); }, 5600);
+}
+
+/* =====================================================================
+   5. NAVEGACIÓN Y CENTRO DE ALERTAS
+   ===================================================================== */
+function renderChrome() {
+  var risk = hiringAtRisk().length, overdue = bottlenecks().length;
+  var groups = [['Selección', [['dashboard', 'layout-dashboard', 'Dashboard', 0], ['vacantes', 'briefcase', 'Vacantes', 0], ['pipeline', 'kanban-square', 'Pipeline de candidatos', overdue], ['evaluador', 'scan-search', 'Evaluador IA de Perfiles', 0]]],
+    ['Ingreso y permanencia', [['contratacion', 'clipboard-check', 'Seguimiento de Contratación', risk], ['rotacion', 'users', 'Rotación y Retención', 0]]],
+    ['Inteligencia', [['copiloto', 'sparkles', 'Copiloto IA', 0]]]];
+  $('#nav').innerHTML = groups.map(function (g) {
+    return '<p class="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">' + g[0] + '</p>' + g[1].map(function (it) {
+      var on = ui.view === it[0];
+      return '<button data-action="nav" data-view="' + it[0] + '" class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ' + (on ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800 hover:text-white') + '"' + (on ? ' aria-current="page"' : '') + '>' + ic(it[1], 'h-[18px] w-[18px] flex-none') + '<span class="flex-1 text-left">' + it[2] + '</span>' + (it[3] ? '<span class="tnum rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white">' + it[3] + '</span>' : '') + '</button>';
+    }).join('');
+  }).join('');
+  var f = ui.filters, chips = [['overdue', 'SLA vencido', 'alert-triangle'], ['high', 'Match ≥ 75%', 'sparkles'], ['unscored', 'Sin evaluar', 'circle-dashed']];
+  $('#quick-filters').innerHTML = (state.demo ? '<span class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">Datos de ejemplo</span>' : '') + chips.map(function (ch) {
+    return '<button data-action="toggle-filter" data-filter="' + ch[0] + '" aria-pressed="' + f[ch[0]] + '" class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ' + (f[ch[0]] ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-700') + '">' + ic(ch[2], 'h-3.5 w-3.5') + ch[1] + '</button>';
+  }).join('');
+  var alerts = allAlerts(), unread = alerts.filter(function (a) { return state.read.indexOf(a.key) < 0; }).length, cnt = $('#notif-count');
+  cnt.textContent = unread > 99 ? '99+' : unread; cnt.hidden = !unread;
+  var panel = $('#notif-panel'); panel.hidden = !ui.notifOpen;
+  if (ui.notifOpen) {
+    panel.innerHTML = '<div class="flex items-center justify-between border-b border-slate-200 px-4 py-3"><div><p class="font-display text-sm font-bold text-slate-900">Centro de alertas</p><p class="text-xs text-slate-500">' + plural(alerts.length, 'alerta activa', 'alertas activas') + ' · ' + unread + ' sin leer</p></div>' + (unread ? '<button data-action="notif-read" class="text-xs font-medium text-indigo-600 hover:underline">Marcar como leídas</button>' : '') + '</div><div class="scroll-thin max-h-96 overflow-y-auto p-1.5">' + (alerts.length ? alerts.map(function (a) {
+      var isNew = state.read.indexOf(a.key) < 0;
+      return '<button data-action="' + a.act + '"' + (a.id ? ' data-id="' + esc(a.id) + '"' : '') + (a.view ? ' data-view="' + a.view + '"' : '') + ' class="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-slate-50"><span class="mt-1 flex h-7 w-7 flex-none items-center justify-center rounded-full ' + (a.level === 'crit' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600') + '">' + ic(a.icon, 'h-3.5 w-3.5') + '</span><span class="min-w-0 flex-1"><span class="flex items-center gap-2"><span class="truncate text-sm font-semibold text-slate-800">' + esc(a.title) + '</span>' + (isNew ? '<span class="h-2 w-2 flex-none rounded-full bg-indigo-600" title="Sin leer"></span>' : '') + '</span><span class="tnum mt-0.5 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ' + (a.level === 'crit' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700') + '">' + esc(a.tag) + '</span><span class="mt-0.5 block text-xs text-slate-500">' + esc(a.text) + '</span></span></button>';
+    }).join('') : '<p class="px-4 py-8 text-center text-sm text-slate-500">Sin alertas activas.</p>') + '</div>';
+  }
+  renderSideFoot();
+}
+function renderSideFoot() {
+  var el = $('#side-foot'); if (!el) return;
+  var SB = 'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white';
+  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos.</div>' +
+    (store.mode !== 'remote' ? '' : '<button data-action="export" class="' + SB + '">' + ic('download', 'h-3.5 w-3.5') + 'Exportar respaldo</button>' +
+      '<label class="' + SB + ' cursor-pointer">' + ic('upload', 'h-3.5 w-3.5') + 'Restaurar respaldo<input id="backup-file" type="file" accept=".json,application/json" class="sr-only"></label>' +
+      (isEmpty() ? '<button data-action="load-demo" class="' + SB + '">' + ic('flask-conical', 'h-3.5 w-3.5') + 'Cargar datos de ejemplo</button>' : '<button data-action="wipe" class="' + SB + '">' + ic('trash-2', 'h-3.5 w-3.5') + 'Borrar todos los datos</button>') +
+      '<button data-action="logout" class="' + SB + '">' + ic('log-out', 'h-3.5 w-3.5') + 'Cerrar sesión</button>');
+}
+function welcomeCard() {
+  return '<section class="card mb-6 flex flex-wrap items-center gap-4 !border-indigo-200 bg-indigo-50/50 p-5"><span class="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('rocket', 'h-5 w-5') + '</span><div class="min-w-0 flex-1 basis-64"><h2 class="font-display text-base font-bold text-slate-900">TalentOS HR está listo para empezar</h2><p class="mt-0.5 text-sm text-slate-600">Aún no hay información. Cree su primera vacante o cargue la plantilla actual para que las tasas de rotación sean correctas.</p></div><div class="flex flex-wrap gap-2"><button data-action="new-vac" class="' + BTN_PRI + '">' + ic('plus') + 'Nueva vacante</button><button data-action="import-emp" class="' + BTN_SEC + '">' + ic('clipboard-paste') + 'Importar plantilla</button><button data-action="load-demo" class="' + BTN_SEC + '">' + ic('flask-conical') + 'Ver con datos de ejemplo</button></div></section>';
+}
+function render() {
+  renderChrome();
+  renderGate();
+  if (store.mode !== 'remote') { $('#view').innerHTML = ''; return; }
+  Object.keys(charts).forEach(function (k) { if (charts[k]) { charts[k].destroy(); charts[k] = null; } });
+  $('#view').innerHTML = '<div class="fade-in mx-auto max-w-[1400px]">' + VIEWS[ui.view]() + '</div>';
+  icons();
+  if (ui.view === 'dashboard') drawDashboardCharts();
+  if (ui.view === 'rotacion') drawRotationCharts();
+  if (ui.view === 'evaluador' && ui.ev.status === 'done') animateGauge();
+}
+function go(view) { ui.view = view; ui.notifOpen = false; closeSidebar(); render(); window.scrollTo(0, 0); }
+function closeSidebar() { $('#sidebar').classList.add('-translate-x-full'); $('#backdrop').hidden = true; }
+function chartsReady(ids) {
+  if (window.Chart) { Chart.defaults.font.family = "'Inter', system-ui, sans-serif"; Chart.defaults.color = '#64748B'; return true; }
+  ids.forEach(function (id) { var el = $('#' + id); if (el) el.parentNode.innerHTML = '<p class="flex h-full items-center justify-center text-sm text-slate-500">No se pudo cargar Chart.js. Revise la conexión a internet.</p>'; });
+  return false;
+}
+var LEGEND = { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8, padding: 12 } }, TOOLTIP = { backgroundColor: '#0F172A', padding: 10 };
+
+/* =====================================================================
+   6. DASHBOARD
+   ===================================================================== */
+function viewDashboard() {
+  var k = kpis(), bn = bottlenecks(), rot = rotation(), risk = hiringAtRisk(), hl = hiringList();
+  var byStage = countBy(bn, function (x) { return x.c.stage; }), worst = topKey(byStage);
+  var alertsHtml = bn.length ? bn.map(function (x) {
+    var v = vacById(x.c.vacancyId);
+    return '<div class="flex flex-wrap items-center gap-3 rounded-xl border border-red-100 bg-red-50/40 px-3.5 py-3">' + avatar(x.c.name) + '<div class="min-w-0 flex-1 basis-44"><p class="truncate text-sm font-semibold text-slate-900">' + esc(x.c.name) + '</p><p class="truncate text-xs text-slate-500">' + esc(STAGES[x.c.stage]) + ' · ' + esc(v ? v.title : 'Sin vacante') + '</p></div><div class="text-right"><span class="tnum inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">' + ic('alert-triangle', 'h-3.5 w-3.5') + 'Vencido hace ' + plural(x.s.over, 'día', 'días') + '</span><p class="tnum mt-1 text-[11px] text-slate-500">' + x.s.days + ' días en etapa · límite ' + x.s.limit + '</p></div><div class="flex gap-1.5"><button data-action="open-cand" data-id="' + x.c.id + '" class="' + BTN_SEC + ' !px-3 !py-1.5 text-xs">Ver candidato</button><button data-action="advance" data-id="' + x.c.id + '" class="' + BTN_PRI + ' !px-3 !py-1.5 text-xs" title="Avanzar a ' + esc(STAGES[x.c.stage + 1]) + '">Avanzar ' + ic('arrow-right', 'h-3.5 w-3.5') + '</button></div></div>';
+  }).join('') : '<div class="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">Ningún candidato supera el tiempo límite de su etapa.</div>';
+  function tile(view, icon, label, value, sub, warn) {
+    return '<button data-action="nav" data-view="' + view + '" class="card flex items-center gap-4 p-4 text-left transition-colors hover:border-indigo-300"><span class="flex h-11 w-11 flex-none items-center justify-center rounded-xl ' + (warn ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600') + '">' + ic(icon, 'h-5 w-5') + '</span><span class="min-w-0 flex-1"><span class="block text-xs font-medium uppercase tracking-wide text-slate-500">' + label + '</span><span class="tnum block font-display text-xl font-bold text-slate-900">' + value + '</span><span class="block truncate text-xs text-slate-500">' + sub + '</span></span>' + ic('chevron-right', 'h-4 w-4 text-slate-300') + '</button>';
+  }
+  return (isEmpty() ? welcomeCard() : '') + pageHead('People Analytics y control de SLA', 'Estado de selección, contratación y rotación al ' + fmtDate(today()) + '.', '<button data-action="new-vac" class="' + BTN_SEC + '">' + ic('plus') + 'Nueva vacante</button><button data-action="nav" data-view="copiloto" class="' + BTN_PRI + '">' + ic('sparkles') + 'Copiloto IA</button>') +
+    '<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">' +
+      kpi('briefcase', 'bg-indigo-50 text-indigo-600', 'Vacantes activas', k.active, plural(state.vacancies.length, 'vacante registrada', 'vacantes registradas')) +
+      kpi('timer', 'bg-sky-50 text-sky-600', 'Tiempo de contratación', k.tth == null ? '—' : k.tth + ' <span class="text-base font-semibold text-slate-400">días</span>', k.tth == null ? 'Sin ingresos recientes con fecha de postulación' : 'Time-to-hire promedio · ' + plural(k.hires, 'ingreso', 'ingresos') + ' en 180 días') +
+      kpi('trending-up', 'bg-emerald-50 text-emerald-600', 'Conversión del embudo', k.conv + '%', k.reached + ' de ' + k.total + ' postulados llegaron a contratación') +
+      kpi('alert-triangle', k.overdue ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500', 'Alertas de vencimiento', '<span class="' + (k.overdue ? 'text-red-600' : '') + '">' + k.overdue + '</span>', k.overdue ? 'Candidatos fuera del SLA de su etapa' : 'Todas las etapas en tiempo') +
+    '</div><div class="mt-4 grid gap-4 md:grid-cols-3">' +
+      tile('vacantes', 'factory', 'Cobertura operativa', k.opCovered + ' / ' + k.opSlots + ' cupos', nf(pct(k.opCovered, k.opSlots)) + '% de los cupos operativos cubiertos') +
+      tile('contratacion', 'clipboard-check', 'En contratación', hl.length, risk.length ? plural(risk.length, 'caso con riesgo de deserción', 'casos con riesgo de deserción') : 'Todos avanzan en tiempo', risk.length > 0) +
+      tile('rotacion', 'users', 'Rotación 12 meses', nf(rot.annual) + '%', 'Temprana (< 90 días): ' + nf(rot.earlyPct) + '% de los ingresos', rot.earlyPct >= 10) +
+    '</div><div class="mt-4 grid gap-4 xl:grid-cols-3">' +
+      '<section class="card p-5 xl:col-span-2"><h2 class="font-display text-base font-bold text-slate-900">Candidatos por etapa</h2><p class="text-xs text-slate-500">Dónde está hoy cada persona y cuántas superan el SLA</p><div class="relative mt-3 h-72"><canvas id="chart-stages" aria-label="Candidatos por etapa" role="img"></canvas></div></section>' +
+      '<section class="card p-5"><h2 class="font-display text-base font-bold text-slate-900">Fuentes de reclutamiento</h2><p class="text-xs text-slate-500">Origen de los ' + k.total + ' candidatos</p><div class="relative mt-3 h-72"><canvas id="chart-sources" aria-label="Fuentes de reclutamiento" role="img"></canvas></div></section>' +
+    '</div><div class="mt-4 grid gap-4 xl:grid-cols-3">' +
+      '<section class="card p-5 xl:col-span-2"><div class="mb-4 flex flex-wrap items-center justify-between gap-2">' + sectionHead('alert-triangle', 'bg-red-50 text-red-600', 'Alertas de cuello de botella', 'Candidatos que llevan más días de los permitidos en su etapa') + (worst ? '<span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">Etapa más crítica: <b class="text-slate-900">' + esc(STAGES[worst.key]) + '</b> (' + worst.n + ')</span>' : '') + '</div><div class="space-y-2">' + alertsHtml + '</div></section>' +
+      '<section class="card p-5">' + sectionHead('settings-2', 'bg-indigo-50 text-indigo-600', 'Tiempos límite', 'Días máximos permitidos (SLA)') +
+        '<form id="form-sla" class="mt-4 space-y-2">' + STAGES.slice(0, 5).map(function (s, i) { return slaRow(s, i); }).join('') + slaRow('Contratación: días sin avance', 5) + '<button type="submit" class="' + BTN_PRI + ' mt-2 w-full">' + ic('save') + 'Guardar y recalcular alertas</button></form></section></div>';
+}
+function slaRow(label, i) { return '<label class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2"><span class="text-sm text-slate-700">' + label + '</span><span class="flex items-center gap-2"><input name="sla' + i + '" type="number" min="1" max="60" required value="' + esc(state.sla[i]) + '" class="tnum w-16 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm"><span class="text-xs text-slate-500">días</span></span></label>'; }
+function drawDashboardCharts() {
+  if (!chartsReady(['chart-stages', 'chart-sources'])) return;
+  var onTime = STAGES.map(function () { return 0; }), late = STAGES.map(function () { return 0; });
+  state.candidates.forEach(function (c) { var s = slaInfo(c), h = c.stage === 5 && c.hiring ? hiringRisk(c) : null; if ((s && s.level === 'crit') || (h && h.level === 'crit')) late[c.stage]++; else onTime[c.stage]++; });
+  charts.stages = new Chart($('#chart-stages'), { type: 'bar', data: { labels: STAGES, datasets: [{ label: 'En tiempo', data: onTime, backgroundColor: '#4F46E5', borderRadius: 6, barThickness: 18 }, { label: 'Fuera de tiempo', data: late, backgroundColor: '#EF4444', borderRadius: 6, barThickness: 18 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#F1F5F9' }, border: { display: false } }, y: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { color: '#334155', font: { weight: 500 } } } }, plugins: { legend: LEGEND, tooltip: TOOLTIP } } });
+  var counts = countBy(state.candidates, function (c) { return c.source; }), labels = Object.keys(counts).sort(function (x, y) { return counts[y] - counts[x]; });
+  charts.sources = new Chart($('#chart-sources'), { type: 'doughnut', data: { labels: labels, datasets: [{ data: labels.map(function (l) { return counts[l]; }), backgroundColor: ['#4F46E5', '#10B981', '#F59E0B', '#0EA5E9', '#8B5CF6', '#94A3B8', '#F43F5E'], borderColor: '#FFFFFF', borderWidth: 3, hoverOffset: 6 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '64%', plugins: { legend: LEGEND, tooltip: TOOLTIP } } });
+}
+
+/* =====================================================================
+   7. VACANTES
+   ===================================================================== */
+function vacancyCards() {
+  var q = normalize(ui.vacSearch).trim();
+  var list = state.vacancies.filter(function (v) { return (!ui.vacStatus || v.status === ui.vacStatus) && (!ui.vacType || v.type === ui.vacType) && (!q || normalize(v.title + ' ' + v.recruiter + ' ' + v.area + ' ' + v.keywords.join(' ')).indexOf(q) >= 0); });
+  if (!list.length) return '<div class="card col-span-full px-6 py-14 text-center text-sm text-slate-500">' + (state.vacancies.length ? 'Ninguna vacante coincide con la búsqueda.' : 'Aún no hay vacantes. Cree la primera con el botón Nueva vacante.') + '</div>';
+  return list.map(function (v) {
+    var p = vacProgress(v), cov = coverage(v), cs = state.candidates.filter(function (c) { return c.vacancyId === v.id; });
+    var open = cs.filter(function (c) { return c.stage < 5; }).length, late = cs.filter(function (c) { var s = slaInfo(c); return s && s.level === 'crit'; }).length, closed = v.status === 'Cerrada';
+    var bar = closed ? 'bg-slate-300' : (p.left < 0 ? 'bg-red-500' : (p.pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'));
+    var label = closed ? 'Vacante cerrada' : (p.left < 0 ? 'Vencida hace ' + plural(-p.left, 'día', 'días') : (p.left === 0 ? 'Vence hoy' : 'Faltan ' + plural(p.left, 'día', 'días')));
+    var labelCls = closed ? 'text-slate-500' : (p.left < 0 ? 'text-red-600' : (p.pct >= 70 ? 'text-amber-600' : 'text-emerald-600'));
+    var covBar = cov.pct >= 100 ? 'bg-emerald-500' : (cov.pct >= 50 ? 'bg-indigo-500' : 'bg-amber-500');
+    return '<article class="card flex flex-col p-5">' +
+      '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="mb-1.5 flex flex-wrap items-center gap-1.5">' + typeBadge(v.type) + '<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">' + esc(v.area) + '</span></div><h3 class="font-display text-base font-bold text-slate-900">' + esc(v.title) + '</h3><p class="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">' + ic('user', 'h-3.5 w-3.5') + esc(v.recruiter) + '</p></div>' + statusBadge(v.status) + '</div>' +
+      '<div class="mt-4 rounded-xl bg-slate-50 p-3"><div class="flex items-center justify-between text-xs"><span class="font-medium text-slate-600">' + (isOp(v) ? 'Cobertura operativa' : 'Cobertura') + '</span><span class="tnum font-semibold text-slate-900">' + cov.covered + ' / ' + cov.slots + ' contratados · ' + cov.pct + '%</span></div><div class="mt-1.5 h-2.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuenow="' + cov.pct + '" aria-valuemin="0" aria-valuemax="100" aria-label="Cupos cubiertos"><div class="h-full rounded-full ' + covBar + '" style="width:' + cov.pct + '%"></div></div><p class="tnum mt-1.5 text-[11px] text-slate-500">' + (cov.open ? plural(cov.open, 'cupo abierto', 'cupos abiertos') : 'Cobertura completa') + ' · ' + cov.hiring + ' en contratación' + (v.startDate ? ' · inicio de operación ' + fmtDate(v.startDate) : '') + '</p>' +
+        (cov.alert ? '<p class="mt-2 flex items-start gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium ' + (cov.alert.level === 'crit' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700') + '">' + ic('alert-triangle', 'mt-px h-3.5 w-3.5 flex-none') + esc(cov.alert.text) + '</p>' : '') + '</div>' +
+      '<div class="mt-3 flex flex-wrap gap-1.5">' + v.keywords.slice(0, 5).map(function (k) { return '<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">' + esc(k) + '</span>'; }).join('') + (v.keywords.length > 5 ? '<span class="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">+' + (v.keywords.length - 5) + '</span>' : '') + '</div>' +
+      '<div class="mt-4"><div class="flex items-center justify-between text-xs"><span class="tnum text-slate-500">' + fmtDate(v.openDate) + ' → ' + fmtDate(v.deadline) + '</span><span class="tnum font-semibold ' + labelCls + '">' + label + '</span></div><div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow="' + p.pct + '" aria-valuemin="0" aria-valuemax="100" aria-label="Plazo consumido"><div class="h-full rounded-full ' + bar + '" style="width:' + p.pct + '%"></div></div></div>' +
+      '<div class="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3 text-xs text-slate-600"><span class="tnum flex items-center gap-1.5">' + ic('users', 'h-3.5 w-3.5 text-slate-400') + '<b class="text-slate-900">' + open + '</b> en selección</span>' + (late ? '<span class="tnum flex items-center gap-1.5 font-medium text-red-600">' + ic('alert-triangle', 'h-3.5 w-3.5') + late + ' con SLA vencido</span>' : '') + '</div>' +
+      '<div class="mt-3 flex flex-wrap gap-2"><button data-action="go-pipeline" data-id="' + v.id + '" class="' + BTN_SEC + ' flex-1 !py-1.5 text-xs">' + ic('kanban-square', 'h-3.5 w-3.5') + 'Ver pipeline</button><button data-action="go-eval" data-id="' + v.id + '" class="' + BTN_SEC + ' flex-1 !py-1.5 text-xs">' + ic('scan-search', 'h-3.5 w-3.5') + 'Evaluar CV</button><button data-action="edit-vac" data-id="' + v.id + '" class="' + BTN_ICON + ' !h-8 !w-8" aria-label="Editar vacante" title="Editar vacante">' + ic('pencil', 'h-3.5 w-3.5') + '</button></div></article>';
+  }).join('');
+}
+function viewVacantes() {
+  return pageHead('Gestión de vacantes', 'Cupos, cobertura y fechas de cada vacante operativa y administrativa.', '<button data-action="new-vac" class="' + BTN_PRI + '">' + ic('plus') + 'Nueva vacante</button>') +
+    '<div class="card mb-4 flex flex-wrap items-center gap-3 p-3"><div class="relative min-w-0 flex-1 basis-60">' + ic('search', 'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400') + '<input id="vac-search" type="search" value="' + esc(ui.vacSearch) + '" placeholder="Buscar por cargo, área, responsable o palabra clave" aria-label="Buscar vacante" class="' + INPUT + ' pl-9"></div><select id="vac-type" aria-label="Tipo de cargo" class="' + INPUT + ' !w-auto"><option value="">Todos los tipos</option>' + options(TYPES, ui.vacType) + '</select><select id="vac-status" aria-label="Estado" class="' + INPUT + ' !w-auto"><option value="">Todos los estados</option>' + options(['Activa', 'Pausada', 'Cerrada'], ui.vacStatus) + '</select></div>' +
+    '<div id="vac-grid" class="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">' + vacancyCards() + '</div>';
+}
+function areaInput(value) { return '<input name="area" list="areas-dl" required maxlength="40" value="' + esc(value) + '" placeholder="Ej.: Producción" class="' + INPUT + '"><datalist id="areas-dl">' + areaList().map(function (a) { return '<option value="' + esc(a) + '">'; }).join('') + '</datalist>'; }
+function keywordTags() { return ui.draftKeywords.map(function (k, i) { return '<span class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700">' + esc(k) + '<button type="button" data-action="kw-del" data-i="' + i + '" class="text-indigo-400 hover:text-indigo-700" aria-label="Quitar ' + esc(k) + '">' + ic('x', 'h-3 w-3') + '</button></span>'; }).join(''); }
+function keywordBank() { return OP_BANK.filter(function (k) { return !ui.draftKeywords.some(function (x) { return normalize(x) === normalize(k); }); }).map(function (k) { return '<button type="button" data-action="kw-add" data-kw="' + esc(k) + '" class="rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-600 hover:border-indigo-400 hover:text-indigo-700">+ ' + esc(k) + '</button>'; }).join(''); }
+function refreshKeywords() { var a = $('#kw-tags'), b = $('#kw-bank'); if (a) a.innerHTML = keywordTags(); if (b) b.innerHTML = keywordBank(); icons(); }
+function openVacancyModal(id) {
+  var t = today(), v = vacById(id) || { title: '', type: 'Operativo', area: 'Producción', slots: 1, description: '', keywords: [], openDate: t, deadline: addDays(t, 30), startDate: addDays(t, 35), recruiter: '', status: 'Activa' };
+  ui.draftKeywords = v.keywords.slice();
+  openModal('<form id="form-vac" data-id="' + esc(id || '') + '">' + modalHead(id ? 'Editar vacante' : 'Nueva vacante', 'Los requisitos clave son los términos que el evaluador buscará en cada hoja de vida.') +
+    '<div class="grid gap-4 px-6 py-5 sm:grid-cols-2">' +
+      field('Título del cargo', '<input name="title" required maxlength="90" value="' + esc(v.title) + '" placeholder="Ej.: Operario de Producción" class="' + INPUT + '">', true) +
+      field('Tipo de cargo', '<select name="type" id="vac-form-type" class="' + INPUT + '">' + options(TYPES, v.type) + '</select>') +
+      field('Área', areaInput(v.area)) +
+      field('Cantidad de cupos / posiciones', '<input name="slots" type="number" min="1" max="500" required value="' + esc(v.slots) + '" class="' + INPUT + '">') +
+      field('Responsable (reclutador)', '<input name="recruiter" required maxlength="70" value="' + esc(v.recruiter) + '" class="' + INPUT + '">') +
+      field('Descripción', '<textarea name="description" rows="2" maxlength="900" placeholder="Propósito del cargo y funciones principales" class="' + INPUT + '">' + esc(v.description) + '</textarea>', true) +
+      '<div class="sm:col-span-2"><span class="mb-1 block text-xs font-medium text-slate-600">Requisitos / palabras clave obligatorias</span><div class="rounded-xl border border-slate-200 p-2"><div id="kw-tags" class="flex flex-wrap gap-1.5">' + keywordTags() + '</div><input id="kw-input" maxlength="50" placeholder="Escriba un requisito y presione Enter o coma" class="mt-1.5 w-full border-0 bg-transparent px-1 py-1 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-0"></div><p class="mb-1 mt-2 text-[11px] font-medium text-slate-500">Requisitos operativos frecuentes (clic para agregar)</p><div id="kw-bank" class="flex flex-wrap gap-1.5">' + keywordBank() + '</div><p class="mt-2 text-[11px] text-slate-500">Use solo requisitos del cargo. Edad, sexo, estado civil o apariencia no son criterios válidos de selección.</p></div>' +
+      field('Fecha de apertura', '<input name="openDate" type="date" required value="' + esc(v.openDate) + '" class="' + INPUT + '">') +
+      field('Fecha límite de contratación', '<input name="deadline" type="date" required value="' + esc(v.deadline) + '" class="' + INPUT + '">') +
+      field('Inicio de turno / operación', '<input name="startDate" type="date" required value="' + esc(v.startDate || '') + '" class="' + INPUT + '">') +
+      field('Estado', '<select name="status" class="' + INPUT + '">' + options(['Activa', 'Pausada', 'Cerrada'], v.status) + '</select>') +
+    '</div>' + modalFoot('<button type="button" data-action="close-modal" class="' + BTN_SEC + '">Cancelar</button><button type="submit" class="' + BTN_PRI + '">' + ic('save') + (id ? 'Guardar cambios' : 'Crear vacante') + '</button>') + '</form>');
+}
+
+/* =====================================================================
+   8. PIPELINE KANBAN Y FICHA DEL CANDIDATO
+   ===================================================================== */
+function filteredCandidates() {
+  var f = ui.filters;
+  return state.candidates.filter(function (c) {
+    if (ui.pipeVac && c.vacancyId !== ui.pipeVac) return false;
+    var s = slaInfo(c), h = c.stage === 5 && c.hiring ? hiringRisk(c) : null;
+    if (f.overdue && !((s && s.level === 'crit') || (h && h.level === 'crit'))) return false;
+    if (f.high && !(c.match != null && c.match >= 75)) return false;
+    if (f.unscored && c.match != null) return false;
+    return true;
+  });
+}
+function isLate(c) { var s = slaInfo(c), h = c.stage === 5 && c.hiring ? hiringRisk(c) : null; return (s && s.level === 'crit') || (h && h.level === 'crit'); }
+function kanbanCard(c) {
+  var v = vacById(c.vacancyId), locked = c.stage === 6 && c.outcome === 'Contratado';
+  return '<div class="kcard card cursor-grab p-3 active:cursor-grabbing ' + (isLate(c) ? '!border-red-300' : '') + '" draggable="' + (locked ? 'false' : 'true') + '" data-id="' + c.id + '"><div class="flex items-start gap-2.5">' + avatar(c.name) + '<div class="min-w-0 flex-1"><button data-action="open-cand" data-id="' + c.id + '" class="block max-w-full truncate text-left text-sm font-semibold text-slate-900 hover:text-indigo-600">' + esc(c.name) + '</button><p class="truncate text-[11px] text-slate-500">' + esc(c.source) + (ui.pipeVac || !v ? '' : ' · ' + esc(v.title)) + '</p></div></div>' +
+    '<div class="mt-2.5 flex flex-wrap items-center gap-1.5">' + matchBadge(c.match) + slaBadge(c) + '</div>' +
+    '<div class="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2"><button data-action="open-cand" data-id="' + c.id + '" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600">' + ic('eye', 'h-3.5 w-3.5') + 'Ver ficha</button><span class="flex gap-1">' +
+      (c.stage > 0 && !locked ? '<button data-action="move" data-id="' + c.id + '" data-to="' + (c.stage - 1) + '" class="' + BTN_ICON + '" aria-label="Devolver a ' + esc(STAGES[c.stage - 1]) + '" title="Devolver a ' + esc(STAGES[c.stage - 1]) + '">' + ic('chevron-left', 'h-3.5 w-3.5') + '</button>' : '') +
+      (c.stage < 5 ? '<button data-action="move" data-id="' + c.id + '" data-to="' + (c.stage + 1) + '" class="' + BTN_ICON + '" aria-label="Avanzar a ' + esc(STAGES[c.stage + 1]) + '" title="Avanzar a ' + esc(STAGES[c.stage + 1]) + '">' + ic('chevron-right', 'h-3.5 w-3.5') + '</button>' : '') +
+      (c.stage === 5 ? '<button data-action="nav" data-view="contratacion" class="' + BTN_ICON + '" aria-label="Ir a Seguimiento de Contratación" title="Ir a Seguimiento de Contratación">' + ic('clipboard-check', 'h-3.5 w-3.5') + '</button>' : '') + '</span></div></div>';
+}
+function viewPipeline() {
+  var list = filteredCandidates(), f = ui.filters, anyFilter = f.overdue || f.high || f.unscored;
+  var cols = STAGES.map(function (s, i) {
+    var cs = list.filter(function (c) { return c.stage === i; }).sort(function (a, b) { return dayNum(a.stageSince) - dayNum(b.stageSince); }), late = cs.filter(isLate).length;
+    return '<section class="kcol flex w-[272px] flex-none flex-col rounded-2xl bg-slate-100/80 p-2.5" data-stage="' + i + '" aria-label="' + s + '"><header class="mb-2 flex items-center justify-between px-1.5 pt-1"><div class="flex items-center gap-2"><h2 class="font-display text-sm font-bold text-slate-800">' + s + '</h2><span class="tnum rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">' + cs.length + '</span>' + (late ? '<span class="tnum rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white" title="Fuera de tiempo">' + late + '</span>' : '') + '</div><span class="tnum text-[11px] text-slate-400">' + (i < 5 ? 'SLA ' + state.sla[i] + ' d' : (i === 5 ? 'Checklist' : 'Sin SLA')) + '</span></header><div class="flex min-h-[120px] flex-1 flex-col gap-2">' + (cs.map(kanbanCard).join('') || '<p class="rounded-xl border border-dashed border-slate-300 px-3 py-6 text-center text-xs text-slate-400">Arrastre aquí un candidato</p>') + '</div></section>';
+  }).join('');
+  return pageHead('Pipeline de candidatos', 'Arrastre las tarjetas o use las flechas. Al llegar a Contratación, el candidato pasa al seguimiento de ingreso.', '<button data-action="new-cand" class="' + BTN_PRI + '">' + ic('user-plus') + 'Nuevo candidato</button>') +
+    '<div class="card mb-4 flex flex-wrap items-center gap-3 p-3"><label class="flex items-center gap-2 text-sm text-slate-600">' + ic('briefcase', 'h-4 w-4 text-slate-400') + '<span class="sr-only">Vacante</span><select id="pipe-vac" class="' + INPUT + ' !w-auto max-w-[70vw]"><option value="">Todas las vacantes</option>' + options(state.vacancies.map(function (v) { return [v.id, v.title]; }), ui.pipeVac) + '</select></label><span class="tnum text-sm text-slate-500">' + plural(list.length, 'candidato', 'candidatos') + (anyFilter ? ' con los filtros activos' : '') + '</span>' + (anyFilter ? '<button data-action="clear-filters" class="text-xs font-medium text-indigo-600 hover:underline">Quitar filtros</button>' : '') + '</div>' +
+    '<div class="scroll-thin -mx-1 overflow-x-auto px-1 pb-4"><div class="flex items-start gap-3">' + cols + '</div></div>';
+}
+function openCandidateForm(vacId) {
+  if (!state.vacancies.length) { toast('Primero cree una vacante.', 'warn'); return; }
+  var def = vacId || ui.pipeVac || (state.vacancies.find(function (v) { return v.status === 'Activa'; }) || state.vacancies[0]).id;
+  openModal('<form id="form-cand">' + modalHead('Nuevo candidato', 'Ingresa en la etapa de Postulación.') + '<div class="grid gap-4 px-6 py-5 sm:grid-cols-2">' +
+      field('Nombre completo', '<input name="name" required maxlength="90" class="' + INPUT + '">', true) +
+      field('Email', '<input name="email" type="email" maxlength="90" placeholder="nombre@ejemplo.com" class="' + INPUT + '">') +
+      field('Teléfono', '<input name="phone" maxlength="24" inputmode="tel" class="' + INPUT + '">') +
+      field('Fuente de reclutamiento', '<select name="source" class="' + INPUT + '">' + options(SOURCES, SOURCES[0]) + '</select>') +
+      field('Vacante', '<select name="vacancyId" class="' + INPUT + '">' + options(state.vacancies.map(function (v) { return [v.id, v.title]; }), def) + '</select>') +
+      field('Observaciones', '<textarea name="notes" rows="3" maxlength="900" class="' + INPUT + '"></textarea>', true) +
+      '<label class="flex items-start gap-2 text-xs text-slate-600 sm:col-span-2"><input name="consent" type="checkbox" required class="mt-0.5 rounded border-slate-300 text-indigo-600"><span>El candidato autorizó el tratamiento de sus datos personales para este proceso de selección (Ley 1581 de 2012).</span></label>' +
+    '</div>' + modalFoot('<button type="button" data-action="close-modal" class="' + BTN_SEC + '">Cancelar</button><button type="submit" class="' + BTN_PRI + '">' + ic('user-plus') + 'Registrar candidato</button>') + '</form>');
+}
+function openCandidate(id) {
+  var c = candById(id); if (!c) return;
+  var v = vacById(c.vacancyId), hired = c.stage === 6 && c.outcome === 'Contratado';
+  var stepper = STAGES.map(function (st, i) {
+    var cls = i < c.stage ? 'bg-indigo-50 text-indigo-700' : (i === c.stage ? 'bg-indigo-600 text-white shadow' : 'bg-slate-100 text-slate-400');
+    return '<button data-action="move" data-id="' + c.id + '" data-to="' + i + '" class="rounded-full px-2.5 py-1 text-[11px] font-medium ' + cls + '" title="Mover a ' + st + '"' + (hired ? ' disabled' : '') + '>' + st + '</button>';
+  }).join('');
+  var history = c.history.map(function (h, i) {
+    var last = i === c.history.length - 1;
+    return '<li class="relative pl-6"><span class="absolute left-0 top-2 h-2.5 w-2.5 rounded-full ' + (last ? 'bg-indigo-600 ring-4 ring-indigo-100' : 'bg-slate-300') + '"></span>' + (last ? '' : '<span class="absolute left-[4.5px] top-5 h-full w-px bg-slate-200"></span>') + '<div class="flex flex-wrap items-center gap-2"><span class="text-sm font-semibold text-slate-800">' + esc(STAGES[h.stage]) + '</span><input type="date" data-hdate="' + i + '" value="' + esc(h.date) + '" aria-label="Fecha de ingreso a ' + esc(STAGES[h.stage]) + '" class="tnum rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600"></div><input data-hnote="' + i + '" value="' + esc(h.note) + '" maxlength="160" placeholder="Nota de esta etapa" aria-label="Nota de ' + esc(STAGES[h.stage]) + '" class="mt-1 w-full rounded-lg border border-transparent bg-slate-50 px-2 py-1 text-xs text-slate-600 hover:border-slate-200"></li>';
+  }).join('');
+  var notes = c.notesLog.length ? c.notesLog.slice().reverse().map(function (n) { return '<div class="rounded-xl bg-slate-50 px-3 py-2"><p class="tnum text-[11px] font-medium text-slate-400">' + fmtDate(n.date) + '</p><p class="whitespace-pre-wrap text-sm text-slate-700">' + esc(n.text) + '</p></div>'; }).join('') : '<p class="text-xs text-slate-400">Sin notas de seguimiento.</p>';
+  openModal('<div class="flex items-start gap-4 border-b border-slate-200 px-6 py-5">' + avatar(c.name, 'h-12 w-12 text-base') + '<div class="min-w-0 flex-1"><h2 id="modal-title" class="truncate font-display text-lg font-bold text-slate-900">' + esc(c.name) + '</h2><p class="truncate text-sm text-slate-500">' + esc(v ? v.title : 'Sin vacante') + ' · ' + esc(c.source) + '</p><div class="mt-2 flex flex-wrap items-center gap-1.5">' + matchBadge(c.match) + slaBadge(c) + '<span class="tnum text-[11px] text-slate-400">En ' + esc(STAGES[c.stage]) + ' desde el ' + fmtDate(c.stageSince) + '</span></div></div><button data-action="close-modal" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Cerrar">' + ic('x', 'h-5 w-5') + '</button></div>' +
+    '<div class="border-b border-slate-200 px-6 py-3"><p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Etapa del proceso</p><div class="flex flex-wrap gap-1.5">' + stepper + '</div>' +
+      (c.stage === 5 ? '<button data-action="nav" data-view="contratacion" class="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:underline">' + ic('clipboard-check', 'h-3.5 w-3.5') + 'Gestionar hitos de ingreso en Seguimiento de Contratación</button>' : '') +
+      (c.stage === 6 && !hired ? '<label class="mt-3 flex items-center gap-2 text-xs text-slate-600">Resultado del cierre <select id="cand-outcome" data-id="' + c.id + '" class="rounded-lg border border-slate-200 px-2 py-1 text-xs">' + options(['No seleccionado', 'Desistió'], c.outcome) + '</select></label>' : '') + '</div>' +
+    '<div class="grid gap-6 px-6 py-5 lg:grid-cols-2"><form id="form-cand-edit" data-id="' + c.id + '" class="space-y-3"><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Datos y observaciones</p>' +
+        field('Nombre completo', '<input name="name" required maxlength="90" value="' + esc(c.name) + '" class="' + INPUT + '">') +
+        '<div class="grid gap-3 sm:grid-cols-2">' + field('Email', '<input name="email" type="email" maxlength="90" value="' + esc(c.email) + '" class="' + INPUT + '">') + field('Teléfono', '<input name="phone" maxlength="24" value="' + esc(c.phone) + '" class="' + INPUT + '">') + '</div>' +
+        '<div class="grid gap-3 sm:grid-cols-2">' + field('Fuente', '<select name="source" class="' + INPUT + '">' + options(SOURCES.indexOf(c.source) < 0 ? SOURCES.concat([c.source]) : SOURCES, c.source) + '</select>') + field('Vacante', '<select name="vacancyId" class="' + INPUT + '">' + options(state.vacancies.map(function (x) { return [x.id, x.title]; }), c.vacancyId) + '</select>') + '</div>' +
+        field('Observaciones', '<textarea name="notes" rows="4" maxlength="900" class="' + INPUT + '">' + esc(c.notes) + '</textarea>') +
+        '<div class="flex flex-wrap items-center gap-2"><button type="submit" class="' + BTN_PRI + '">' + ic('save') + 'Guardar datos</button><button type="button" data-action="del-cand" data-id="' + c.id + '" class="' + BTN + 'text-red-600 hover:bg-red-50">' + ic('trash-2') + 'Eliminar</button></div><p class="text-[11px] text-slate-400">Elimine el registro cuando el candidato solicite retirar sus datos.</p></form>' +
+      '<div class="space-y-5"><div><div class="mb-2 flex items-center justify-between"><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Trazabilidad por etapa</p><button data-action="save-history" data-id="' + c.id + '" class="text-xs font-medium text-indigo-600 hover:underline">Guardar fechas y notas</button></div><ol class="space-y-3">' + history + '</ol></div>' +
+        '<div><p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Notas de seguimiento</p><div class="scroll-thin max-h-44 space-y-2 overflow-y-auto">' + notes + '</div><div class="mt-2 flex gap-2"><input id="note-input" maxlength="400" placeholder="Agregar una nota…" aria-label="Nueva nota" class="' + INPUT + '"><button data-action="add-note" data-id="' + c.id + '" class="' + BTN_SEC + '">Agregar</button></div></div></div></div>', true);
+}
+
+/* =====================================================================
+   9. SEGUIMIENTO DE CONTRATACIÓN (PRE-INGRESO)
+   ===================================================================== */
+function viewContratacion() {
+  var list = hiringList().map(function (c) { return { c: c, r: hiringRisk(c) }; });
+  var order = { crit: 0, warn: 1, ready: 2, ok: 3 };
+  list.sort(function (a, b) { return order[a.r.level] - order[b.r.level] || a.r.toStart - b.r.toStart; });
+  var risk = list.filter(function (x) { return x.r.level === 'crit' || x.r.level === 'warn'; }).length, ready = list.filter(function (x) { return x.r.level === 'ready'; }).length;
+  var soon = list.filter(function (x) { return x.r.toStart >= 0 && x.r.toStart <= 7; }).length;
+  var noShow = state.candidates.filter(function (c) { return c.stage === 6 && c.outcome === 'Desistió' && c.hiring; }).length;
+  var rows = list.map(function (x) {
+    var c = x.c, r = x.r, h = c.hiring, v = vacById(c.vacancyId);
+    var rowCls = r.level === 'crit' ? 'bg-red-50/50' : (r.level === 'warn' ? 'bg-amber-50/50' : '');
+    var steps = HIRE_STEPS.map(function (st, i) {
+      var s = h.steps[i], label = i === 1 ? (s.done ? 'Apto' : 'Pendiente') : st.s;
+      return '<button data-action="toggle-step" data-id="' + c.id + '" data-step="' + i + '" aria-pressed="' + s.done + '" title="' + esc(st.t) + (s.done ? ' · ' + fmtDate(s.date) : ' · pendiente') + '" class="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border px-2 py-1 text-[11px] font-medium ' + (s.done ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:border-indigo-300') + '">' + ic(s.done ? 'check-circle-2' : 'circle', 'h-3.5 w-3.5') + (i === 1 ? 'Exámenes: ' : '') + esc(label) + '</button>';
+    }).join('');
+    var barCls = r.pct === 100 ? 'bg-emerald-500' : 'bg-indigo-500';
+    return '<tr class="border-t border-slate-100 align-top ' + rowCls + '">' +
+      '<td class="px-3 py-3"><div class="flex items-center gap-2.5">' + avatar(c.name) + '<div class="min-w-0"><button data-action="open-cand" data-id="' + c.id + '" class="block max-w-[180px] truncate text-left text-sm font-semibold text-slate-900 hover:text-indigo-600">' + esc(c.name) + '</button><p class="max-w-[180px] truncate text-[11px] text-slate-500">' + esc(v ? v.title : 'Sin vacante') + '</p></div></div></td>' +
+      '<td class="px-3 py-3"><input type="date" data-start="' + c.id + '" value="' + esc(h.startDate) + '" aria-label="Fecha de ingreso de ' + esc(c.name) + '" class="tnum rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"><p class="tnum mt-1 text-[11px] ' + (r.toStart < 0 ? 'font-semibold text-red-600' : 'text-slate-500') + '">' + (r.toStart < 0 ? 'Vencida hace ' + plural(-r.toStart, 'día', 'días') : (r.toStart === 0 ? 'Ingresa hoy' : 'En ' + plural(r.toStart, 'día', 'días'))) + '</p></td>' +
+      '<td class="px-3 py-3"><div class="flex max-w-[430px] flex-wrap gap-1.5">' + steps + '</div><div class="mt-2 flex items-center gap-2"><div class="h-1.5 w-40 overflow-hidden rounded-full bg-slate-200"><div class="h-full rounded-full ' + barCls + '" style="width:' + r.pct + '%"></div></div><span class="tnum text-[11px] font-semibold text-slate-600">' + r.done + ' de 5 · ' + r.pct + '%</span></div></td>' +
+      '<td class="px-3 py-3">' + pill(r.label, r.level === 'ok' ? 'ok' : r.level, r.level === 'ready' ? 'check' : (r.level === 'ok' ? 'clock' : 'alert-triangle')) + (r.reason ? '<p class="mt-1 max-w-[210px] text-[11px] text-slate-600">' + esc(r.reason) + '</p>' : '') + (r.lastContact ? '<p class="tnum mt-1 max-w-[210px] text-[11px] text-slate-400" title="' + esc(r.lastContact.note) + '">Último contacto: ' + fmtDate(r.lastContact.date) + '</p>' : '') + '</td>' +
+      '<td class="px-3 py-3"><div class="flex flex-col items-stretch gap-1.5">' + (r.level === 'ready' ? '<button data-action="activate" data-id="' + c.id + '" class="' + BTN_OK + ' whitespace-nowrap !px-3 !py-1.5 text-xs">' + ic('user-check', 'h-3.5 w-3.5') + 'Activar en Nómina / Operación</button>' : '<button class="' + BTN_SEC + ' whitespace-nowrap !px-3 !py-1.5 text-xs" disabled title="Complete los 5 hitos para activar">' + ic('lock', 'h-3.5 w-3.5') + 'Activar en Nómina / Operación</button>') +
+        '<button data-action="contact" data-id="' + c.id + '" class="' + (r.level === 'crit' || r.level === 'warn' ? BTN_PRI : BTN_SEC) + ' whitespace-nowrap !px-3 !py-1.5 text-xs">' + ic('phone', 'h-3.5 w-3.5') + 'Registrar contacto / Reprogramar</button><button data-action="no-show" data-id="' + c.id + '" class="text-[11px] font-medium text-slate-400 hover:text-red-600">Registrar que desistió</button></div></td></tr>';
+  }).join('');
+  return pageHead('Seguimiento de Contratación', 'Legalización del ingreso entre la aprobación y el primer día de trabajo.', '<button data-action="nav" data-view="pipeline" class="' + BTN_SEC + '">' + ic('kanban-square') + 'Ver pipeline</button>') +
+    '<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">' +
+      kpi('clipboard-check', 'bg-indigo-50 text-indigo-600', 'En legalización', list.length, 'Candidatos aprobados con hitos en curso') +
+      kpi('alert-triangle', risk ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500', 'Riesgo de deserción', '<span class="' + (risk ? 'text-red-600' : '') + '">' + risk + '</span>', 'Más de ' + plural(Number(state.sla[5]), 'día', 'días') + ' sin avance o ingreso inminente') +
+      kpi('user-check', 'bg-emerald-50 text-emerald-600', 'Listos para activar', ready, 'Con los 5 hitos completos') +
+      kpi('calendar', 'bg-sky-50 text-sky-600', 'Ingresan en 7 días', soon, plural(noShow, 'deserción antes del ingreso registrada', 'deserciones antes del ingreso registradas')) +
+    '</div><section class="card mt-4 overflow-hidden">' + (list.length ? '<div class="scroll-thin overflow-x-auto"><table class="w-full min-w-[980px] text-sm"><thead class="bg-slate-50"><tr><th class="' + TH + '">Candidato</th><th class="' + TH + '">Fecha de ingreso</th><th class="' + TH + '">Hitos de contratación</th><th class="' + TH + '">Estado</th><th class="' + TH + '">Acciones</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<p class="px-6 py-14 text-center text-sm text-slate-500">No hay candidatos en legalización. Aparecerán aquí al pasar a la etapa Contratación del pipeline.</p>') + '</section>' +
+    '<div class="mt-4 grid gap-4 lg:grid-cols-2"><div class="card flex items-start gap-3 p-4 text-xs leading-relaxed text-slate-600">' + ic('shield-check', 'mt-0.5 h-4 w-4 flex-none text-indigo-500') + '<p><b class="text-slate-900">Exámenes médicos:</b> aquí solo se registra el resultado de aptitud. Los diagnósticos y la historia clínica ocupacional no deben guardarse en esta herramienta. El costo de los exámenes lo asume el empleador (Resolución 1843 de 2025).</p></div><div class="card flex items-start gap-3 p-4 text-xs leading-relaxed text-slate-600">' + ic('shield-check', 'mt-0.5 h-4 w-4 flex-none text-indigo-500') + '<p><b class="text-slate-900">Afiliaciones:</b> radique la afiliación a la ARL a más tardar el día anterior al ingreso, porque se entiende efectuada al día siguiente de recibido el formulario (Decreto 1072 de 2015, art. 2.2.4.2.1.3). La consulta de antecedentes requiere autorización del candidato.</p></div></div>';
+}
+function openContactModal(id) {
+  var c = candById(id); if (!c || !c.hiring) return;
+  var log = c.hiring.contacts.slice().reverse().map(function (x) { return '<li class="rounded-lg bg-slate-50 px-3 py-2"><span class="tnum text-[11px] font-medium text-slate-400">' + fmtDate(x.date) + '</span><p class="text-xs text-slate-700">' + esc(x.note) + '</p></li>'; }).join('');
+  openModal('<form id="form-contact" data-id="' + c.id + '">' + modalHead('Registrar contacto / Reprogramar', c.name + ' · ingreso previsto el ' + fmtDate(c.hiring.startDate)) + '<div class="space-y-4 px-6 py-5">' +
+    field('Resultado del contacto', '<textarea name="note" rows="3" required maxlength="400" placeholder="Ej.: Confirmó exámenes para mañana a las 7:00 a. m." class="' + INPUT + '"></textarea>') +
+    field('Nueva fecha de ingreso (opcional)', '<input name="startDate" type="date" min="' + today() + '" value="" class="' + INPUT + '">') +
+    (log ? '<div><p class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Contactos anteriores</p><ul class="scroll-thin max-h-40 space-y-1.5 overflow-y-auto">' + log + '</ul></div>' : '') +
+    '</div>' + modalFoot('<button type="button" data-action="close-modal" class="' + BTN_SEC + '">Cancelar</button><button type="submit" class="' + BTN_PRI + '">' + ic('save') + 'Guardar contacto</button>') + '</form>');
+}
+
+/* =====================================================================
+   10. ROTACIÓN Y RETENCIÓN
+   ===================================================================== */
+function directoryRows() {
+  var list = state.employees.filter(function (e) { return (!ui.dirStatus || e.status === ui.dirStatus) && (!ui.dirArea || e.area === ui.dirArea); })
+    .sort(function (a, b) { return (a.status === 'Activo' ? 0 : 1) - (b.status === 'Activo' ? 0 : 1) || dayNum(b.hireDate) - dayNum(a.hireDate); });
+  if (!list.length) return '<tr><td colspan="7" class="px-3 py-10 text-center text-sm text-slate-500">' + (state.employees.length ? 'Ningún colaborador coincide con los filtros.' : 'Aún no hay colaboradores. Agréguelos uno a uno o importe la plantilla desde Excel.') + '</td></tr>';
+  return list.map(function (e) {
+    var d = tenure(e), ten = d < 60 ? plural(d, 'día', 'días') : (d < 730 ? Math.round(d / 30.4) + ' meses' : (Math.round(d / 36.5) / 10).toLocaleString('es-CO') + ' años');
+    return '<tr class="border-t border-slate-100"><td class="px-3 py-2.5"><div class="flex items-center gap-2.5">' + avatar(e.name, 'h-8 w-8 text-[11px]') + '<div class="min-w-0"><p class="max-w-[190px] truncate text-sm font-semibold text-slate-900">' + esc(e.name) + '</p><p class="max-w-[190px] truncate text-[11px] text-slate-500">' + esc(e.role) + '</p></div></div></td>' +
+      '<td class="px-3 py-2.5 text-xs text-slate-700">' + esc(e.area) + '<span class="block text-[11px] text-slate-400">Turno ' + esc(e.shift) + '</span></td><td class="px-3 py-2.5">' + typeBadge(e.type) + '</td>' +
+      '<td class="tnum whitespace-nowrap px-3 py-2.5 text-xs text-slate-700">' + fmtDate(e.hireDate) + '<span class="block text-[11px] text-slate-400">' + ten + (e.status === 'Activo' && d < 90 ? ' · onboarding' : '') + '</span></td>' +
+      '<td class="px-3 py-2.5">' + statusBadge(e.status) + '</td>' +
+      '<td class="px-3 py-2.5 text-xs text-slate-600">' + (e.status === 'Retirado' ? '<span class="tnum block whitespace-nowrap text-slate-700">' + fmtDate(e.exitDate) + ' · ' + esc(e.exitType) + '</span><span class="block max-w-[220px] truncate text-[11px] text-slate-500" title="' + esc(e.exitNotes) + '">' + esc(e.exitReason) + (tenure(e) < 90 ? ' · <b class="text-red-600">temprana</b>' : '') + '</span>' : '<span class="text-slate-300">—</span>') + '</td>' +
+      '<td class="px-3 py-2.5 text-right">' + (e.status === 'Activo' ? '<button data-action="new-exit" data-id="' + e.id + '" class="whitespace-nowrap text-xs font-medium text-slate-500 hover:text-red-600">Registrar retiro</button>' : '') + '</td></tr>';
+  }).join('');
+}
+function retentionPanel() {
+  var list = onboardingList().sort(function (a, b) { return dayNum(b.hireDate) - dayNum(a.hireDate); });
+  if (!list.length) return '<p class="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No hay colaboradores con menos de 90 días de antigüedad.</p>';
+  return '<div class="space-y-2">' + list.map(function (e) {
+    var d = tenure(e), st = retentionState(e), late = st.filter(function (x) { return x.late; }).length;
+    return '<div class="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-3 py-2.5">' + avatar(e.name, 'h-8 w-8 text-[11px]') + '<div class="min-w-0 flex-1 basis-40"><p class="truncate text-sm font-semibold text-slate-900">' + esc(e.name) + '</p><p class="tnum truncate text-[11px] text-slate-500">' + esc(e.area) + ' · turno ' + esc(e.shift) + ' · día ' + d + ' de 90</p></div>' +
+      (e.retention ? '<div class="flex flex-wrap gap-1.5">' + st.map(function (x) {
+        return '<button data-action="toggle-check" data-id="' + e.id + '" data-check="' + x.ck.k + '" aria-pressed="' + x.done + '" title="' + esc(x.ck.t + ' · ' + x.ck.s) + ' · vence ' + fmtDate(x.due) + '" class="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border px-2 py-1 text-[11px] font-medium ' + (x.done ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : (x.late ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-500 hover:border-indigo-300')) + '">' + ic(x.done ? 'check-circle-2' : (x.late ? 'alert-triangle' : 'circle'), 'h-3.5 w-3.5') + esc(x.ck.t.replace('Día ', 'D')) + '</button>';
+      }).join('') + '</div>' + (late ? pill(plural(late, 'hito vencido', 'hitos vencidos'), 'crit') : '') : '<span class="text-[11px] text-slate-400">Sin checklist 30-60-90</span><button data-action="apply-one" data-id="' + e.id + '" class="text-xs font-medium text-indigo-600 hover:underline">Aplicar</button>') + '</div>';
+  }).join('') + '</div>';
+}
+function viewRotacion() {
+  var r = rotation(), ob = onboardingList(), noPlan = ob.filter(function (e) { return !e.retention; }).length;
+  var worstArea = r.byArea.slice().sort(function (a, b) { return b.rate - a.rate; })[0];
+  var shift = topKey(countBy(r.ex12.filter(isOp), function (e) { return e.shift; }));
+  return pageHead('Rotación y Retención', 'Plantilla activa: ' + r.active + ' colaboradores. Tasas calculadas sobre la plantilla promedio del periodo.', '<button data-action="nav" data-view="copiloto" class="' + BTN_SEC + '">' + ic('sparkles') + 'Plan de retención IA</button><button data-action="new-exit" class="' + BTN_PRI + '">' + ic('user-minus') + 'Registrar Retiro / Baja</button>') +
+    '<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">' +
+      kpi('calendar', 'bg-indigo-50 text-indigo-600', 'Rotación del mes', nf(r.monthly) + '%', plural(r.exM.length, 'baja', 'bajas') + ' sobre ' + r.avgM.toLocaleString('es-CO') + ' personas promedio') +
+      kpi('refresh-cw', 'bg-sky-50 text-sky-600', 'Rotación anual', nf(r.annual) + '%', plural(r.ex12.length, 'baja', 'bajas') + ' en 12 meses · plantilla promedio ' + r.avgY.toLocaleString('es-CO')) +
+      kpi('user-x', r.early12 ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500', 'Rotación temprana', '<span class="' + (r.early12 ? 'text-red-600' : '') + '">' + nf(r.earlyPct) + '%</span>', r.early12 + ' de ' + r.hires12 + ' ingresos del año se retiraron antes de 90 días') +
+      kpi('banknote', 'bg-amber-50 text-amber-600', 'Costo estimado', '<span class="text-2xl">' + money(r.cost) + '</span>', 'Bajas de 12 meses × costo de reemplazo') +
+    '</div><div class="mt-4 grid gap-4 xl:grid-cols-3">' +
+      '<section class="card p-5"><h2 class="font-display text-base font-bold text-slate-900">Motivos de retiro</h2><p class="text-xs text-slate-500">Bajas de los últimos 12 meses</p><div class="relative mt-3 h-64"><canvas id="chart-reasons" aria-label="Motivos de retiro" role="img"></canvas></div></section>' +
+      '<section class="card p-5"><h2 class="font-display text-base font-bold text-slate-900">Bajas por mes y tipo de cargo</h2><p class="text-xs text-slate-500">Operativos frente a administrativos · 6 meses</p><div class="relative mt-3 h-64"><canvas id="chart-monthly" aria-label="Bajas por mes" role="img"></canvas></div></section>' +
+      '<section class="card p-5"><h2 class="font-display text-base font-bold text-slate-900">Rotación por área</h2><p class="text-xs text-slate-500">Tasa de 12 meses sobre la plantilla promedio del área</p><div class="relative mt-3 h-64"><canvas id="chart-areas" aria-label="Rotación por área" role="img"></canvas></div></section>' +
+    '</div>' + (r.ex12.length ? '<p class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-indigo-50/60 px-4 py-2.5 text-xs text-slate-700">' + ic('lightbulb', 'h-4 w-4 text-indigo-500') + '<span>Área con mayor fuga: <b>' + esc(worstArea.area) + '</b> (' + nf(worstArea.rate) + '% · ' + plural(worstArea.exits, 'baja', 'bajas') + ')</span>' + (shift ? '<span>Turno operativo con más bajas: <b>' + esc(shift.key) + '</b> (' + shift.n + ')</span>' : '') + '<span class="text-slate-500">Con pocos registros estas señales son indicios, no conclusiones.</span></p>' : '') +
+    '<div class="mt-4 grid gap-4 xl:grid-cols-3"><section class="card p-5 xl:col-span-2"><div class="mb-3 flex flex-wrap items-center justify-between gap-2">' + sectionHead('route', 'bg-emerald-50 text-emerald-600', 'Seguimiento 30-60-90 de nuevos ingresos', plural(ob.length, 'colaborador', 'colaboradores') + ' con menos de 90 días') + (noPlan ? '<button data-action="apply-checklist" class="' + BTN_SEC + ' !py-1.5 text-xs">' + ic('list-checks', 'h-3.5 w-3.5') + 'Aplicar checklist a ' + noPlan + '</button>' : '') + '</div>' + retentionPanel() + '</section>' +
+      '<section class="card p-5">' + sectionHead('banknote', 'bg-amber-50 text-amber-600', 'Costo de reemplazo por baja', 'Parámetro para el costo de rotación') + '<form id="form-costs" class="mt-4 space-y-3">' + field('Cargo operativo (COP)', '<input name="op" type="number" min="0" step="50000" required value="' + esc(state.costs.op) + '" class="' + INPUT + ' tnum">') + field('Cargo administrativo (COP)', '<input name="adm" type="number" min="0" step="50000" required value="' + esc(state.costs.adm) + '" class="' + INPUT + ' tnum">') + '<button type="submit" class="' + BTN_SEC + ' w-full">' + ic('save') + 'Guardar y recalcular</button><p class="text-[11px] leading-relaxed text-slate-500">Valores de ejemplo. Reemplácelos por su costo real: reclutamiento, exámenes, dotación, inducción y curva de aprendizaje.</p></form></section></div>' +
+    '<section class="card mt-4 overflow-hidden"><div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-3"><div><h2 class="font-display text-base font-bold text-slate-900">Directorio de colaboradores</h2><p class="text-xs text-slate-500">' + state.employees.length + ' registros · ' + r.active + ' activos · ' + r.exits.length + ' retirados</p></div><div class="flex flex-wrap gap-2"><button data-action="new-emp" class="' + BTN_SEC + ' !py-1.5 text-xs">' + ic('user-plus', 'h-3.5 w-3.5') + 'Agregar colaborador</button><button data-action="import-emp" class="' + BTN_SEC + ' !py-1.5 text-xs">' + ic('clipboard-paste', 'h-3.5 w-3.5') + 'Importar desde Excel</button><select id="dir-area" aria-label="Área" class="' + INPUT + ' !w-auto !py-1.5 text-xs"><option value="">Todas las áreas</option>' + options(areaList(), ui.dirArea) + '</select><select id="dir-status" aria-label="Estado" class="' + INPUT + ' !w-auto !py-1.5 text-xs"><option value="">Todos los estados</option>' + options(['Activo', 'Retirado'], ui.dirStatus) + '</select></div></div><div class="scroll-thin overflow-x-auto"><table class="w-full min-w-[860px] text-sm"><thead class="bg-slate-50"><tr><th class="' + TH + '">Colaborador</th><th class="' + TH + '">Área</th><th class="' + TH + '">Tipo</th><th class="' + TH + '">Ingreso</th><th class="' + TH + '">Estado</th><th class="' + TH + '">Retiro</th><th class="' + TH + '"></th></tr></thead><tbody id="dir-body">' + directoryRows() + '</tbody></table></div></section>';
+}
+function drawRotationCharts() {
+  if (!chartsReady(['chart-reasons', 'chart-monthly', 'chart-areas'])) return;
+  var r = rotation(), rc = countBy(r.ex12, function (e) { return e.exitReason; }), labels = EXIT_REASONS.filter(function (k) { return rc[k]; });
+  charts.reasons = new Chart($('#chart-reasons'), { type: 'doughnut', data: { labels: labels, datasets: [{ data: labels.map(function (l) { return rc[l]; }), backgroundColor: ['#4F46E5', '#F59E0B', '#EF4444', '#0EA5E9', '#8B5CF6', '#94A3B8'], borderColor: '#FFFFFF', borderWidth: 3 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: LEGEND, tooltip: TOOLTIP } } });
+  var now = new Date(), months = [];
+  for (var i = 5; i >= 0; i--) { var d = new Date(now.getFullYear(), now.getMonth() - i, 1); months.push({ key: d.getFullYear() + '-' + pad(d.getMonth() + 1), label: MONTHS[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2) }); }
+  var cnt = function (type) { return months.map(function (m) { return r.exits.filter(function (e) { return e.exitDate.slice(0, 7) === m.key && (type === 'op' ? isOp(e) : !isOp(e)); }).length; }); };
+  charts.monthly = new Chart($('#chart-monthly'), { type: 'bar', data: { labels: months.map(function (m) { return m.label; }), datasets: [{ label: 'Operativos', data: cnt('op'), backgroundColor: '#4F46E5', borderRadius: 5 }, { label: 'Administrativos', data: cnt('adm'), backgroundColor: '#94A3B8', borderRadius: 5 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: { display: false }, border: { display: false } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#F1F5F9' }, border: { display: false } } }, plugins: { legend: LEGEND, tooltip: TOOLTIP } } });
+  charts.areas = new Chart($('#chart-areas'), { type: 'bar', data: { labels: r.byArea.map(function (a) { return a.area; }), datasets: [{ label: 'Rotación 12 meses (%)', data: r.byArea.map(function (a) { return a.rate; }), backgroundColor: r.byArea.map(function (a) { return a.rate >= 30 ? '#EF4444' : (a.rate >= 15 ? '#F59E0B' : '#10B981'); }), borderRadius: 6, barThickness: 22 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true, ticks: { callback: function (v) { return v + '%'; } }, grid: { color: '#F1F5F9' }, border: { display: false } }, y: { grid: { display: false }, border: { display: false }, ticks: { color: '#334155', font: { weight: 500 } } } }, plugins: { legend: { display: false }, tooltip: Object.assign({ callbacks: { afterLabel: function (ctx) { var a = r.byArea[ctx.dataIndex]; return plural(a.exits, 'baja', 'bajas') + ' · ' + a.active + ' activos'; } } }, TOOLTIP) } } });
+}
+function openExitModal(empId) {
+  var actives = state.employees.filter(function (e) { return e.status === 'Activo'; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+  if (!actives.length) { toast('No hay colaboradores activos.', 'warn'); return; }
+  openModal('<form id="form-exit">' + modalHead('Registrar Retiro / Baja', 'Incluye los datos de la entrevista de salida. Las tasas y los gráficos se recalculan al guardar.') + '<div class="grid gap-4 px-6 py-5 sm:grid-cols-2">' +
+    field('Colaborador', '<select name="empId" required class="' + INPUT + '">' + options(actives.map(function (e) { return [e.id, e.name + ' · ' + e.role]; }), empId || actives[0].id) + '</select>', true) +
+    field('Fecha de salida', '<input name="exitDate" type="date" required max="' + today() + '" value="' + today() + '" class="' + INPUT + '">') +
+    field('Tipo de retiro', '<select name="exitType" class="' + INPUT + '">' + options(['Voluntario', 'Involuntario'], 'Voluntario') + '</select>') +
+    field('Motivo principal', '<select name="exitReason" class="' + INPUT + '">' + options(EXIT_REASONS, EXIT_REASONS[0]) + '</select>', true) +
+    field('Observaciones de la entrevista de salida', '<textarea name="exitNotes" rows="3" maxlength="600" placeholder="Qué dijo la persona, qué habría evitado su salida" class="' + INPUT + '"></textarea>', true) +
+    '<p class="text-[11px] leading-relaxed text-slate-500 sm:col-span-2">Registre hechos y motivos laborales. No incluya diagnósticos médicos ni información sensible de la persona.</p></div>' + modalFoot('<button type="button" data-action="close-modal" class="' + BTN_SEC + '">Cancelar</button><button type="submit" class="' + BTN + 'bg-red-600 text-white hover:bg-red-700">' + ic('user-minus') + 'Registrar retiro</button>') + '</form>');
+}
+function openEmployeeModal() {
+  openModal('<form id="form-emp">' + modalHead('Agregar colaborador', 'Registre a quienes ya hacen parte de la plantilla para que las tasas de rotación sean correctas.') + '<div class="grid gap-4 px-6 py-5 sm:grid-cols-2">' +
+    field('Nombre completo', '<input name="name" required maxlength="90" class="' + INPUT + '">', true) + field('Cargo', '<input name="role" required maxlength="70" class="' + INPUT + '">') + field('Área', areaInput('')) +
+    field('Tipo de cargo', '<select name="type" class="' + INPUT + '">' + options(TYPES, TYPES[0]) + '</select>') + field('Turno', '<select name="shift" class="' + INPUT + '">' + options(SHIFTS, 'Por asignar') + '</select>') +
+    field('Fecha de ingreso', '<input name="hireDate" type="date" required max="' + today() + '" class="' + INPUT + '">') + '</div>' + modalFoot('<button type="button" data-action="close-modal" class="' + BTN_SEC + '">Cancelar</button><button type="submit" class="' + BTN_PRI + '">' + ic('user-plus') + 'Agregar</button>') + '</form>');
+}
+function openImportModal() {
+  openModal('<form id="form-import">' + modalHead('Importar plantilla desde Excel', 'Copie las filas en Excel y péguelas aquí. Una fila por colaborador.') + '<div class="space-y-3 px-6 py-5"><p class="rounded-xl bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">Columnas, en este orden: <b>Nombre · Cargo · Área · Tipo</b> (Operativo o Administrativo) <b>· Turno</b> (Mañana, Tarde, Noche o Diurno) <b>· Fecha de ingreso</b> (DD/MM/AAAA o AAAA-MM-DD).</p><textarea name="rows" rows="9" required placeholder="Nombre&#9;Cargo&#9;Área&#9;Tipo&#9;Turno&#9;Fecha de ingreso" aria-label="Filas copiadas de Excel" class="' + INPUT + ' font-mono text-xs"></textarea><p class="text-[11px] text-slate-500">No incluya número de documento, salario ni datos de salud: el sistema no los necesita.</p></div>' + modalFoot('<button type="button" data-action="close-modal" class="' + BTN_SEC + '">Cancelar</button><button type="submit" class="' + BTN_PRI + '">' + ic('clipboard-paste') + 'Importar</button>') + '</form>');
+}
+function applyChecklist(onlyId) {
+  var n = 0;
+  onboardingList().forEach(function (e) { if (!e.retention && (!onlyId || e.id === onlyId)) { e.retention = { appliedAt: today(), checks: { d15: false, d30: false, d60: false, d90: false } }; n++; } });
+  if (n) save();
+  return n;
+}
+
+/* =====================================================================
+   11. COPILOTO IA: ESTRATEGA DE RETENCIÓN OPERATIVA (PRIMEROS 90 DÍAS)
+   ===================================================================== */
+var FOCI = [['todos', 'Todos los frentes'], ['induccion', 'Inducción y acompañamiento 30-60-90'], ['liderazgo', 'Liderazgo de supervisores de planta'], ['compensacion', 'Compensación y turnos']];
+var BUDGETS = ['Bajo · alto impacto sin costo', 'Medio', 'Alto'];
+var TARGETS = [15, 25, 35];
+/* Cada acción: [texto, foco, presupuesto mínimo (0 bajo, 1 medio, 2 alto)] */
+var ROADMAP = [
+  { t: 'Día 1 a 15', s: 'Aterrizaje y padrino operativo', icon: 'handshake', base: ['Asignar un padrino operativo del mismo turno desde el primer día.', 'Confirmar ruta de transporte y turno asignado antes del ingreso.', 'Entregar la dotación y los elementos de protección completos el día 1 y dejar registro.'],
+    extra: [['Inducción al puesto en tres jornadas cortas, con lista de verificación firmada.', 'induccion', 0], ['El supervisor recibe personalmente a cada ingreso y explica las metas de la primera semana.', 'liderazgo', 0], ['Explicar por escrito cómo se liquidan recargos, horas extra y fechas de pago.', 'compensacion', 0], ['Jornada de integración por cohorte con refrigerio y recorrido de planta.', 'induccion', 1], ['Apoyo de transporte durante el primer mes para turnos sin ruta (validar con nómina y jurídico).', 'compensacion', 2]] },
+  { t: 'Día 30', s: 'Pulso temprano', icon: 'activity', base: ['Entrevista de adaptación de 10 minutos con Gestión Humana.', 'Revisión ergonómica y operativa del puesto con Seguridad y Salud en el Trabajo.'],
+    extra: [['Retroalimentación uno a uno del supervisor con dos fortalezas y un punto de mejora.', 'liderazgo', 0], ['Verificar que el primer pago coincidió con lo ofrecido en selección.', 'compensacion', 0], ['Refuerzo de entrenamiento en las tareas con más errores.', 'induccion', 1]] },
+  { t: 'Día 60', s: 'Feedback del supervisor', icon: 'message-square', base: ['Evaluación de la curva de aprendizaje frente al estándar del puesto.', 'Reconocimiento temprano frente al equipo.', 'Decidir sobre el periodo de prueba antes de su vencimiento: máximo dos meses (art. 78 del CST).'],
+    extra: [['Taller práctico de liderazgo cercano para supervisores de turno.', 'liderazgo', 1], ['Bono de permanencia no salarial al completar 60 días (validar con jurídico y nómina).', 'compensacion', 1]] },
+  { t: 'Día 90', s: 'Consolidación', icon: 'award', base: ['Conversación de permanencia: qué lo haría quedarse y qué lo haría irse.', 'Presentar la ruta de carrera operativa: polivalencia, líder de línea, supervisor.'],
+    extra: [['Certificar al colaborador como padrino de la siguiente cohorte.', 'induccion', 0], ['Indicador de rotación temprana por supervisor en el comité mensual.', 'liderazgo', 0], ['Revisión de la banda salarial de los cargos operativos críticos frente al mercado.', 'compensacion', 2], ['Programa formal de desarrollo de supervisores.', 'liderazgo', 2]] }
+];
+var CORRECTIVES = {
+  'Horarios / Turnos': [['Publicar la programación de turnos con al menos 15 días de anticipación.', 'compensacion', 0], ['Permitir el intercambio de turnos entre compañeros con aprobación del supervisor.', 'compensacion', 0], ['En selección, explicar el esquema de turnos con un caso real y confirmar por escrito que lo acepta.', 'induccion', 0], ['Dar prioridad de cambio de turno por antigüedad y hacer visible la lista de espera.', 'liderazgo', 0], ['Pasar el turno nocturno fijo a rotación por ciclos cortos, dentro de la jornada máxima legal.', 'compensacion', 1], ['Ruta de transporte para el cierre del turno nocturno.', 'compensacion', 2]],
+  'Ubicación / Transporte': [['Priorizar el reclutamiento en localidades con transporte directo a la sede.', 'induccion', 0], ['Validar tiempo y costo de desplazamiento en el filtro telefónico.', 'induccion', 0], ['Organizar grupos de transporte compartido por zona de residencia.', 'liderazgo', 0], ['Ajustar la hora de inicio de turno a la oferta real de transporte público.', 'compensacion', 1], ['Ruta de acercamiento contratada para los turnos de madrugada y noche.', 'compensacion', 2]],
+  'Clima / Liderazgo': [['Conversación semanal de cinco minutos entre supervisor y nuevo ingreso durante el primer mes.', 'liderazgo', 0], ['Medir la rotación temprana por supervisor y revisarla en comité mensual.', 'liderazgo', 0], ['Canal confidencial para reportar maltrato, con ruta al Comité de Convivencia Laboral.', 'liderazgo', 0], ['Padrino operativo distinto del supervisor, como segundo apoyo.', 'induccion', 0], ['Entrenamiento en liderazgo cercano y retroalimentación para supervisores de turno.', 'liderazgo', 1], ['Programa formal de desarrollo de supervisores con acompañamiento en piso.', 'liderazgo', 2]],
+  'Mejor oferta salarial': [['Entrevista de permanencia al día 30 para detectar ofertas externas a tiempo.', 'induccion', 0], ['Comunicar el valor total de la compensación: salario, recargos, beneficios y estabilidad.', 'compensacion', 0], ['Reconocimiento visible del supervisor al cumplir metas del primer mes.', 'liderazgo', 0], ['Bono de permanencia no salarial a los 60 y 90 días (validar con jurídico y nómina).', 'compensacion', 1], ['Estudio de competitividad salarial de los cargos operativos críticos.', 'compensacion', 2]],
+  'Abandono de cargo': [['Contactar a la persona el mismo día de la primera ausencia injustificada.', 'liderazgo', 0], ['Mostrar el cargo real antes de la oferta: frío, ritmo, turnos y esfuerzo físico.', 'induccion', 0], ['Padrino operativo responsable del acompañamiento en las dos primeras semanas.', 'induccion', 0], ['Tablero semanal de ausentismo de nuevos ingresos.', 'liderazgo', 1]],
+  'Terminación de contrato': [['Revisar la calidad del filtro de selección en los cargos con más terminaciones.', 'induccion', 0], ['Definir criterios objetivos para evaluar el periodo de prueba.', 'liderazgo', 0], ['Refuerzo de entrenamiento antes de decidir una terminación por desempeño.', 'induccion', 1]]
+};
+function retentionDiagnosis() {
+  var early = state.employees.filter(function (e) { return e.status === 'Retirado' && isOp(e) && tenure(e) < 90; });
+  var opExits = state.employees.filter(function (e) { return e.status === 'Retirado' && isOp(e); });
+  var area = topKey(countBy(early, function (e) { return e.area; })), shift = topKey(countBy(early, function (e) { return e.shift; })), reason = topKey(countBy(early, function (e) { return e.exitReason; }));
+  var r = rotation();
+  return { early: early, n: early.length, opExits: opExits.length, area: area, shift: shift, reason: reason, cost: early.length * Number(state.costs.op), avgTenure: early.length ? Math.round(early.reduce(function (a, e) { return a + tenure(e); }, 0) / early.length) : 0, earlyPct: r.earlyPct, hires12: r.hires12, early12: r.early12, onboarding: onboardingList() };
+}
+function pick(list, focus, budget) {
+  var out = list.filter(function (a) { return a[2] <= budget && (focus === 'todos' || a[1] === focus); });
+  if (out.length < 2) out = list.filter(function (a) { return a[2] <= budget; });
+  return out;
+}
+function buildPlan(d, focus, budget) {
+  var reasonKey = d.reason ? d.reason.key : null;
+  var road = ROADMAP.map(function (ck) { return { t: ck.t, s: ck.s, icon: ck.icon, actions: ck.base.concat(pick(ck.extra, focus, budget).map(function (a) { return a[0]; })) }; });
+  var correctives = reasonKey && CORRECTIVES[reasonKey] ? pick(CORRECTIVES[reasonKey], focus, budget) : [];
+  var text;
+  if (!d.n) text = 'No hay retiros de operarios con menos de 90 días registrados. El plan se entrega como medida preventiva para los ' + d.onboarding.length + ' colaboradores que hoy están en sus primeros 90 días.';
+  else {
+    text = plural(d.n, 'operario se retiró', 'operarios se retiraron') + ' antes de cumplir 90 días, con una permanencia promedio de ' + d.avgTenure + ' días. ';
+    if (d.reason) text += 'El motivo ' + (d.reason.tie ? 'más frecuente (empatado con otros)' : 'predominante') + ' es "' + d.reason.key + '" (' + d.reason.n + ' de ' + d.n + '). ';
+    if (d.shift) text += 'El turno con más salidas tempranas es ' + d.shift.key + ' (' + d.shift.n + ')' + (d.area ? ' y el área ' + (d.area.tie ? 'no muestra una concentración clara' : 'más afectada es ' + d.area.key) : '') + '. ';
+    text += 'Esas salidas representan ' + money(d.cost) + ' en costo de reemplazo. Hoy el ' + nf(d.earlyPct) + '% de los ingresos de los últimos 12 meses no llega al día 90.';
+  }
+  return { road: road, correctives: correctives, reasonKey: reasonKey, text: text, focus: focus, budget: budget, smallSample: d.n > 0 && d.n < 5 };
+}
+function runCopilot() {
+  var cop = ui.cop; cop.status = 'analyzing'; cop.step = 0; cop.plan = null; render();
+  var tick = function () {
+    cop.step++;
+    if (cop.step < 4) { if (ui.view === 'copiloto') render(); setTimeout(tick, 430); }
+    else { cop.plan = buildPlan(retentionDiagnosis(), cop.focus, cop.budget); cop.target = TARGETS[cop.budget]; cop.status = 'done'; if (ui.view === 'copiloto') render(); }
+  };
+  setTimeout(tick, 430);
+}
+function impactHtml(d) {
+  var cop = ui.cop, base = Math.max(d.early12, d.n), target = Math.min(90, Math.max(0, Number(cop.target) || 0));
+  var avoided = base * target / 100, newPct = d.hires12 ? Math.round((d.early12 * (1 - target / 100)) / d.hires12 * 1000) / 10 : 0;
+  return '<div class="grid gap-3 sm:grid-cols-3"><div class="rounded-xl bg-white p-3 ring-1 ring-slate-200"><p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Rotación temprana</p><p class="tnum mt-1 font-display text-xl font-bold text-slate-900">' + nf(d.earlyPct) + '% <span class="text-slate-400">→</span> <span class="text-emerald-600">' + nf(newPct) + '%</span></p><p class="text-[11px] text-slate-500">de los ingresos del año</p></div>' +
+    '<div class="rounded-xl bg-white p-3 ring-1 ring-slate-200"><p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Salidas evitadas al año</p><p class="tnum mt-1 font-display text-xl font-bold text-slate-900">' + (Math.round(avoided * 10) / 10).toLocaleString('es-CO') + '</p><p class="text-[11px] text-slate-500">sobre ' + plural(base, 'salida temprana', 'salidas tempranas') + '</p></div>' +
+    '<div class="rounded-xl bg-white p-3 ring-1 ring-slate-200"><p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Ahorro proyectado</p><p class="tnum mt-1 font-display text-xl font-bold text-emerald-600">' + money(avoided * Number(state.costs.op)) + '</p><p class="text-[11px] text-slate-500">a ' + money(Number(state.costs.op)) + ' por reemplazo</p></div></div>';
+}
+function viewCopiloto() {
+  var cop = ui.cop, d = retentionDiagnosis();
+  function dx(icon, label, value, sub, toneCls) { return '<div class="rounded-xl border border-slate-200 bg-white p-3.5"><p class="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">' + ic(icon, 'h-3.5 w-3.5 ' + (toneCls || 'text-slate-400')) + label + '</p><p class="mt-1.5 font-display text-base font-bold leading-tight text-slate-900">' + value + '</p><p class="tnum mt-0.5 text-[11px] text-slate-500">' + sub + '</p></div>'; }
+  var diag = '<section class="card p-5"><div class="flex flex-wrap items-center justify-between gap-2">' + sectionHead('scan-search', 'bg-indigo-50 text-indigo-600', 'Diagnóstico automático', 'Leído ahora de los retiros registrados en el sistema') + pill('Datos en tiempo real', 'info', 'refresh-cw') + '</div><div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">' +
+      dx('user-x', 'Salidas tempranas', d.n + ' <span class="text-xs font-medium text-slate-500">de ' + d.opExits + ' retiros operativos</span>', d.n ? 'Permanencia promedio: ' + d.avgTenure + ' días' : 'Sin casos registrados', 'text-red-500') +
+      dx('factory', 'Área crítica', d.area ? esc(d.area.tie ? 'Sin concentración' : d.area.key) : '—', d.area ? (d.area.tie ? 'Los casos se reparten entre áreas' : d.area.n + ' de ' + d.n + ' casos') : 'Sin datos') +
+      dx('moon', 'Turno crítico', d.shift ? esc(d.shift.tie ? 'Sin concentración' : d.shift.key) : '—', d.shift ? (d.shift.tie ? 'Los casos se reparten entre turnos' : d.shift.n + ' de ' + d.n + ' casos') : 'Sin datos') +
+      dx('message-square', 'Motivo predominante', d.reason ? esc(d.reason.key) : '—', d.reason ? d.reason.n + ' de ' + d.n + ' casos' + (d.reason.tie ? ' (empate)' : '') : 'Sin datos') +
+      dx('banknote', 'Costo acumulado', d.n ? money(d.cost) : '$0', 'A ' + money(Number(state.costs.op)) + ' por reemplazo', 'text-amber-500') + '</div>' +
+      (d.n > 0 && d.n < 5 ? '<p class="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">' + ic('alert-triangle', 'mt-0.5 h-3.5 w-3.5 flex-none') + 'Muestra pequeña (' + plural(d.n, 'caso', 'casos') + '): trate el diagnóstico como hipótesis y confírmelo con entrevistas de salida y de permanencia.</p>' : '') + '</section>';
+  var params = '<section class="card p-5">' + sectionHead('sliders-horizontal', 'bg-indigo-50 text-indigo-600', 'Parámetros de intervención', 'Ajustan las acciones que propone el plan') + '<div class="mt-4 grid gap-4 md:grid-cols-3">' + field('Foco de intervención', '<select id="cop-focus" class="' + INPUT + '">' + options(FOCI, cop.focus) + '</select>') + field('Presupuesto disponible', '<select id="cop-budget" class="' + INPUT + '">' + options(BUDGETS.map(function (b, i) { return [i, b]; }), cop.budget) + '</select>') + '<div class="flex items-end"><button data-action="cop-run" class="' + BTN_PRI + ' w-full !py-2.5"' + (cop.status === 'analyzing' ? ' disabled' : '') + '>' + ic('sparkles') + 'Generar Plan de Retención IA</button></div></div></section>';
+  var out = '';
+  if (cop.status === 'analyzing') {
+    var steps = ['Leyendo retiros y antigüedades del directorio', 'Filtrando rotación temprana en cargos operativos', 'Cruzando área, turno y motivo de retiro', 'Armando el plan de choque'];
+    out = '<section class="card flex flex-col items-center justify-center p-10"><span class="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">' + ic('loader-2', 'spin h-7 w-7') + '</span><h2 class="mt-4 font-display text-lg font-bold text-slate-900">Analizando la rotación temprana…</h2><ul class="mt-5 w-full max-w-sm space-y-2.5">' + steps.map(function (st, i) { var done = i < cop.step, now = i === cop.step; return '<li class="flex items-center gap-2.5 text-sm ' + (done ? 'text-slate-700' : (now ? 'font-medium text-indigo-700' : 'text-slate-400')) + '">' + (done ? ic('check-circle-2', 'h-4 w-4 text-emerald-500') : (now ? ic('loader-2', 'spin h-4 w-4') : ic('circle', 'h-4 w-4'))) + st + '</li>'; }).join('') + '</ul></section>';
+  } else if (cop.status === 'done' && cop.plan) {
+    var p = cop.plan, pending = d.onboarding.filter(function (e) { return !e.retention; }).length;
+    out = '<section class="card overflow-hidden"><div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-gradient-to-br from-indigo-50/70 to-white px-6 py-5"><div><p class="text-[11px] font-semibold uppercase tracking-wider text-indigo-600">Plan de choque · primeros 90 días</p><h2 class="mt-1 font-display text-xl font-bold text-slate-900">Estratega de Retención Operativa</h2><p class="mt-1 text-xs text-slate-500">Foco: ' + esc(FOCI.find(function (f) { return f[0] === p.focus; })[1]) + ' · Presupuesto: ' + esc(BUDGETS[p.budget]) + '</p></div><button data-action="apply-checklist" class="' + BTN_OK + '"' + (pending ? '' : ' disabled') + '>' + ic('list-checks') + (pending ? 'Aplicar Checklist de Seguimiento 30-60-90 a Nuevos Ingresos (' + pending + ')' : 'Checklist 30-60-90 ya aplicado') + '</button></div>' +
+      '<div class="space-y-7 p-6">' +
+        '<div><p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">1 · Diagnóstico ejecutivo</p><p class="max-w-4xl text-sm leading-relaxed text-slate-700">' + esc(p.text) + '</p></div>' +
+        '<div><p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">2 · Hoja de ruta de los primeros 90 días</p><ol class="grid gap-3 lg:grid-cols-4">' + p.road.map(function (ck, i) {
+          return '<li class="relative rounded-2xl border border-slate-200 p-4"><div class="flex items-center gap-2.5"><span class="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic(ck.icon, 'h-[18px] w-[18px]') + '</span><div><p class="tnum font-display text-sm font-bold text-slate-900">' + ck.t + '</p><p class="text-[11px] text-slate-500">' + ck.s + '</p></div></div><ul class="mt-3 space-y-2">' + ck.actions.map(function (a) { return '<li class="flex items-start gap-2 text-xs leading-relaxed text-slate-700">' + ic('check', 'mt-0.5 h-3.5 w-3.5 flex-none text-emerald-500') + '<span>' + esc(a) + '</span></li>'; }).join('') + '</ul>' + (i < 3 ? '<span class="absolute -right-2.5 top-7 hidden h-px w-5 bg-slate-300 lg:block"></span>' : '') + '</li>';
+        }).join('') + '</ol></div>' +
+        '<div><p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">3 · Acciones correctivas según el motivo principal' + (p.reasonKey ? ': <span class="text-indigo-600">' + esc(p.reasonKey) + '</span>' : '') + '</p>' + (p.correctives.length ? '<div class="grid gap-2 md:grid-cols-2">' + p.correctives.map(function (a) { return '<div class="flex items-start gap-3 rounded-xl border border-slate-200 px-3.5 py-3"><span class="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-lg bg-amber-50 text-amber-600">' + ic('zap', 'h-3.5 w-3.5') + '</span><div class="min-w-0 flex-1"><p class="text-sm text-slate-800">' + esc(a[0]) + '</p><p class="mt-1 flex flex-wrap gap-1.5">' + pill(FOCI.find(function (f) { return f[0] === a[1]; })[1].split(' ')[0], 'ok') + pill(a[2] === 0 ? 'Sin costo' : (a[2] === 1 ? 'Costo medio' : 'Inversión alta'), a[2] === 0 ? 'good' : (a[2] === 1 ? 'warn' : 'info')) + '</p></div></div>'; }).join('') + '</div>' : '<p class="text-sm text-slate-500">Sin motivo predominante registrado. Aplique la hoja de ruta y registre el motivo en cada retiro para afinar las acciones.</p>') + '</div>' +
+        '<div class="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5"><div class="flex flex-wrap items-end justify-between gap-3"><div><p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">4 · Meta de impacto proyectada</p><p class="mt-1 max-w-xl text-xs leading-relaxed text-slate-600">La reducción es una meta de trabajo que usted define, no una predicción. El sistema solo calcula qué significaría alcanzarla con las cifras actuales.</p></div><label class="flex items-center gap-2 text-xs font-medium text-slate-700">Meta de reducción<input id="cop-target" type="number" min="0" max="90" step="5" value="' + esc(cop.target) + '" class="tnum w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-right text-sm">%</label></div><div id="cop-impact" class="mt-4">' + impactHtml(d) + '</div></div>' +
+        '<p class="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-[11px] leading-relaxed text-slate-500">' + ic('info', 'mt-0.5 h-3.5 w-3.5 flex-none') + '<span><b>Cómo se genera:</b> el plan se arma con reglas a partir de los retiros, turnos, áreas y motivos guardados en este navegador, y de una biblioteca de buenas prácticas de retención. No es un modelo de lenguaje ni conoce el contexto de su planta. Las acciones de compensación, turnos y bonos requieren validación de jurídico y nómina antes de aplicarse.' + (p.smallSample ? ' El diagnóstico se basa en pocos casos.' : '') + '</span></p></div></section>';
+  } else {
+    out = '<section class="card flex flex-col items-center justify-center p-10 text-center"><span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">' + ic('route', 'h-7 w-7') + '</span><h2 class="mt-4 font-display text-lg font-bold text-slate-900">El plan de choque aparecerá aquí</h2><p class="mt-1 max-w-md text-sm text-slate-500">Elija el foco y el presupuesto, y genere el plan. Incluye diagnóstico, hoja de ruta de 90 días, acciones según el motivo principal y la meta de impacto.</p></section>';
+  }
+  return pageHead('Copiloto IA de Gestión Humana', 'Estratega de Retención Operativa: convierte los datos de rotación temprana en un plan para los primeros 90 días.', '<button data-action="nav" data-view="rotacion" class="' + BTN_SEC + '">' + ic('users') + 'Ver rotación</button>') + '<div class="space-y-4">' + diag + params + out + '</div>';
+}
+
+/* =====================================================================
+   12. EVALUADOR DE PERFILES: LECTURA DE PDF/TXT Y ANÁLISIS LÉXICO
+   ===================================================================== */
+function normalize(s) { return ' ' + String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9+#.\s]/g, ' ').replace(/\.(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim() + ' '; }
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function countKeyword(normText, keyword) {
+  var words = normalize(keyword).trim().split(' ').filter(Boolean); if (!words.length) return 0;
+  var pattern = words.map(function (w) { var base = w.length > 3 && /s$/.test(w) ? w.slice(0, -1) : w; return escapeRe(base) + '(?:s|es)?'; }).join(' ');
+  var m = normText.match(new RegExp(' ' + pattern + '(?= )', 'g')); return m ? m.length : 0;
+}
+function guessName(raw, fileName) {
+  var lines = raw.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean).slice(0, 6);
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i].replace(/\s*\(.*\)\s*$/, '');
+    if (/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]{5,60}$/.test(l) && !/curr[ií]cul|hoja de vida|perfil|resumen|\bcv\b|experiencia|contacto/i.test(l)) { var w = l.split(/\s+/); if (w.length >= 2 && w.length <= 5) return l; }
+  }
+  var base = String(fileName || '').replace(/\.[a-z0-9]+$/i, '').replace(/[_\-.]+/g, ' ').replace(/\b(cv|hoja de vida|hv|curriculum|resume)\b/gi, '').replace(/\d+/g, '').trim();
+  return base.split(/\s+/).length >= 2 ? base.replace(/\b[a-zñáéíóú]/g, function (ch) { return ch.toUpperCase(); }) : '';
+}
+function analyzeCV(raw, vacancy, fileName) {
+  var norm = normalize(raw);
+  var rows = vacancy.keywords.map(function (k) { return { keyword: k, count: countKeyword(norm, k) }; });
+  var found = rows.filter(function (r) { return r.count > 0; }).sort(function (a, b) { return b.count - a.count; }), missing = rows.filter(function (r) { return r.count === 0; });
+  var score = rows.length ? Math.round(found.length / rows.length * 100) : 0;
+  var extra = isOp(vacancy) ? OP_BANK.filter(function (k) { return !vacancy.keywords.some(function (x) { return normalize(x) === normalize(k); }) && countKeyword(norm, k) > 0; }) : [];
+  var email = (raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i) || [''])[0];
+  var phone = (raw.match(/\+?\d[\d\s().-]{6,16}\d/g) || []).filter(function (p) { var d = p.replace(/\D/g, ''); return d.length >= 7 && d.length <= 13 && !/^(19|20)\d{2}\s*[-–—]\s*(19|20)\d{2}$/.test(p.trim()); })[0] || '';
+  var mentioned = 0, m, reYears = / (\d{1,2}) ?\+? ?(?:anos|ano|years|year) /g;
+  while ((m = reYears.exec(norm))) { var n = Number(m[1]); if (n > mentioned && n <= 45) mentioned = n; reYears.lastIndex -= 1; }
+  var ranges = 0, reRange = /((?:19|20)\d{2})\s*(?:-|–|—|a|al|hasta)\s*((?:19|20)\d{2}|actual(?:idad)?|presente|hoy|current|present)/gi, thisYear = new Date().getFullYear();
+  while ((m = reRange.exec(raw))) { var a = Number(m[1]), b = /^\d/.test(m[2]) ? Number(m[2]) : thisYear; if (b >= a && b - a <= 45 && b <= thisYear + 1) ranges += b - a; }
+  var tier = score >= 75 ? 'alto' : (score >= 50 ? 'medio' : 'bajo'), names = function (list, max) { return list.slice(0, max).map(function (r) { return r.keyword; }).join(', '); };
+  var diag = {
+    alto: { title: 'Perfil altamente compatible', text: 'El CV menciona ' + found.length + ' de los ' + rows.length + ' requisitos clave de la vacante. Se recomienda avanzar a preselección y validar en entrevista la experiencia real en: ' + (names(found, 3) || 'los requisitos encontrados') + '.' },
+    medio: { title: 'Compatible con brechas', text: 'El CV cubre ' + found.length + ' de ' + rows.length + ' requisitos. Puede avanzar a preselección con una validación focalizada de las brechas' + (missing.length ? ': ' + names(missing, 4) : '') + '.' },
+    bajo: { title: 'Baja coincidencia: revisar antes de descartar', text: 'El CV menciona solo ' + found.length + ' de ' + rows.length + ' requisitos. No se recomienda avanzar sin una revisión manual: en cargos operativos las hojas de vida suelen ser breves y describen la misma experiencia con otras palabras.' }
+  }[tier];
+  return { score: score, tier: tier, found: found, missing: missing, total: rows.length, extra: extra, contact: { name: guessName(raw, fileName), email: email, phone: phone.trim() }, years: { mentioned: mentioned, ranges: ranges, best: mentioned || ranges }, words: norm.trim() ? norm.trim().split(' ').length : 0, diag: diag,
+    strengths: found.slice(0, 4).map(function (r) { return r.keyword + (r.count > 1 ? ' (' + r.count + ' menciones)' : ''); }), gaps: missing.slice(0, 5).map(function (r) { return r.keyword; }) };
+}
+function readTxt(file) { return new Promise(function (resolve, reject) { var fr = new FileReader(); fr.onload = function () { resolve({ text: String(fr.result || ''), pages: 0 }); }; fr.onerror = function () { reject(new Error('No se pudo leer el archivo de texto.')); }; fr.readAsText(file, 'UTF-8'); }); }
+function readPdf(file) {
+  if (!window.pdfjsLib) return Promise.reject(new Error('No se pudo cargar PDF.js. Revise la conexión a internet y recargue la página.'));
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  return file.arrayBuffer().then(function (buf) { return pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise; }).then(function (pdf) {
+    var jobs = [];
+    for (var p = 1; p <= pdf.numPages; p++) jobs.push(pdf.getPage(p).then(function (page) { return page.getTextContent(); }).then(function (tc) { return tc.items.map(function (it) { return it.str + (it.hasEOL ? '\n' : ' '); }).join(''); }));
+    return Promise.all(jobs).then(function (pages) {
+      var text = pages.join('\n\n').replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+      if (text.length < 40) throw new Error('El PDF no contiene texto seleccionable (parece un documento escaneado). Use un PDF con texto o un archivo .txt.');
+      return { text: text, pages: pdf.numPages };
+    });
+  });
+}
+function handleFile(file) {
+  if (!file) return;
+  var name = file.name.toLowerCase(), ev = ui.ev;
+  if (!/\.(pdf|txt)$/.test(name)) { ev.error = 'Formato no admitido. Cargue un archivo .pdf o .txt.'; render(); return; }
+  if (file.size > 10 * 1024 * 1024) { ev.error = 'El archivo supera los 10 MB.'; render(); return; }
+  ev.status = 'reading'; ev.error = ''; ev.result = null; ev.fileName = file.name; render();
+  (/\.pdf$/.test(name) ? readPdf(file) : readTxt(file)).then(function (r) { ev.text = r.text.trim(); ev.pages = r.pages; ev.status = 'idle'; if (!ev.text) ev.error = 'El archivo está vacío.'; render(); })
+    .catch(function (e) { ev.status = 'idle'; ev.text = ''; ev.error = (e && e.message) || 'No se pudo leer el archivo.'; render(); });
+}
+function sampleCV(v) {
+  var ks = v.keywords, have = ks.slice(0, Math.max(1, Math.ceil(ks.length * 0.7))), y = new Date().getFullYear();
+  if (isOp(v)) return 'Andrea Morales Pineda\nBogotá, localidad de Kennedy · andrea.morales@ejemplo.com · +57 300 555 0199\n\nPERFIL\nBachiller con 3 años de experiencia en cargos operativos. Disponibilidad inmediata para turnos rotativos, responsable y con buen trabajo en equipo. Experiencia en cuarto frío y en cargue y descargue.\n\nEXPERIENCIA\n' + (y - 2) + ' - Actualidad · Alimentos Ficticios S.A.S.\n' + v.title + '. Funciones: ' + have.slice(0, 4).join(', ') + '.\n\n' + (y - 3) + ' - ' + (y - 2) + ' · Distribuidora Demo Ltda.\nAuxiliar operativo. Apoyo en ' + (have.slice(4).join(', ') || 'labores generales') + '.\n\nFORMACIÓN\nBachiller académico. Curso de manipulación de alimentos.\n\n(CV de ejemplo con datos ficticios)';
+  return 'Andrea Morales Pineda\n' + v.title + '\nBogotá, Colombia · andrea.morales@ejemplo.com · +57 300 555 0199\n\nPERFIL PROFESIONAL\nProfesional con 6 años de experiencia en cargos relacionados con ' + v.title.toLowerCase() + '.\n\nEXPERIENCIA\n' + (y - 3) + ' - Actualidad · Empresa Ficticia Andina S.A.S.\nResponsable de ' + have.slice(0, 3).join(', ') + '.\n\n' + (y - 6) + ' - ' + (y - 3) + ' · Servicios Demo Ltda.\nApoyo en ' + have.slice(3).join(', ') + '.\n\nCONOCIMIENTOS\n' + have.join(' · ') + '\n\n(CV de ejemplo con datos ficticios)';
+}
+function runAnalysis() {
+  var ev = ui.ev, v = vacById(ev.vacId), ta = $('#ev-text'); if (ta) ev.text = ta.value.trim();
+  if (!v) { ev.error = 'Seleccione una vacante.'; render(); return; }
+  if (!v.keywords.length) { ev.error = 'La vacante no tiene palabras clave. Edítela y agregue requisitos.'; render(); return; }
+  if (ev.text.length < 60) { ev.error = 'Cargue un archivo o pegue el texto de la hoja de vida (mínimo 60 caracteres).'; render(); return; }
+  ev.error = ''; ev.status = 'analyzing'; ev.step = 0; ev.result = null; render();
+  var tick = function () { ev.step++; if (ev.step < 4) { if (ui.view === 'evaluador') render(); setTimeout(tick, 420); } else { ev.result = analyzeCV(ev.text, v, ev.fileName); ev.status = 'done'; if (ui.view === 'evaluador') render(); } };
+  setTimeout(tick, 420);
+}
+function animateGauge() {
+  var ring = $('#gauge-ring'), num = $('#gauge-num'), r = ui.ev.result; if (!ring || !r) return;
+  var C = 2 * Math.PI * 54;
+  requestAnimationFrame(function () { requestAnimationFrame(function () { ring.style.strokeDashoffset = String(C * (1 - r.score / 100)); }); });
+  var start = null, step = function (ts) { if (!start) start = ts; var p = Math.min(1, (ts - start) / 1100); num.textContent = Math.round(r.score * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function viewEvaluador() {
+  var ev = ui.ev, active = state.vacancies.filter(function (v) { return v.status === 'Activa'; });
+  if (!vacById(ev.vacId) || vacById(ev.vacId).status !== 'Activa') ev.vacId = active.length ? active[0].id : '';
+  var v = vacById(ev.vacId), busy = ev.status === 'reading' || ev.status === 'analyzing';
+  var left = '<section class="card p-5"><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">1 · Vacante a comparar</p>' + (active.length ? '<select id="ev-vac" aria-label="Vacante" class="' + INPUT + ' mt-2">' + options(active.map(function (x) { return [x.id, x.title + (isOp(x) ? ' · operativo' : '')]; }), ev.vacId) + '</select>' : '<p class="mt-2 text-sm text-slate-500">No hay vacantes activas.</p>') +
+      (v ? '<div class="mt-3 flex flex-wrap gap-1.5">' + v.keywords.map(function (k) { return '<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">' + esc(k) + '</span>'; }).join('') + '</div>' + (isOp(v) ? '<p class="mt-2 text-[11px] text-slate-500">Vacante operativa: además se buscan señales como turnos rotativos, montacargas, BPM, SST o disponibilidad inmediata.</p>' : '') : '') +
+      '<p class="mt-5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">2 · Hoja de vida</p><label id="dropzone" for="ev-file" class="dropzone mt-2 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center transition-colors hover:border-indigo-400"><span class="flex h-11 w-11 items-center justify-center rounded-full bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200">' + (ev.status === 'reading' ? ic('loader-2', 'spin h-5 w-5') : ic('upload-cloud', 'h-5 w-5')) + '</span><span class="mt-3 text-sm font-semibold text-slate-800">' + (ev.status === 'reading' ? 'Extrayendo texto de ' + esc(ev.fileName) + '…' : 'Arrastre un archivo o haga clic para seleccionarlo') + '</span><span class="mt-1 text-xs text-slate-500">PDF o TXT · hasta 10 MB · se procesa en este navegador, sin enviarlo a ningún servidor</span><input id="ev-file" type="file" accept=".pdf,.txt,application/pdf,text/plain" class="sr-only"></label>' +
+      '<div class="mt-3 flex flex-wrap items-center gap-2"><button data-action="ev-sample" class="' + BTN_SEC + ' text-xs"' + (v && !busy ? '' : ' disabled') + '>' + ic('file-text', 'h-3.5 w-3.5') + 'Cargar CV de ejemplo</button>' + (ev.text ? '<button data-action="ev-clear" class="' + BTN + 'text-xs text-slate-500 hover:bg-slate-100">' + ic('x', 'h-3.5 w-3.5') + 'Limpiar</button>' : '') + (ev.fileName && ev.text ? '<span class="tnum inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">' + ic('check', 'h-3 w-3') + esc(ev.fileName) + (ev.pages ? ' · ' + plural(ev.pages, 'página', 'páginas') : '') + '</span>' : '') + '</div>' +
+      (ev.error ? '<p class="mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">' + ic('alert-triangle', 'mt-0.5 h-4 w-4 flex-none') + esc(ev.error) + '</p>' : '') +
+      '<details class="mt-4 rounded-xl border border-slate-200"' + (ev.text ? '' : ' open') + '><summary class="cursor-pointer select-none px-3 py-2 text-xs font-medium text-slate-600">' + (ev.text ? 'Vista previa del texto extraído (' + ev.text.length.toLocaleString('es-CO') + ' caracteres)' : 'O pegue aquí el texto de la hoja de vida') + '</summary><textarea id="ev-text" rows="9" aria-label="Texto de la hoja de vida" placeholder="Texto de la hoja de vida…" class="scroll-thin w-full resize-y border-0 border-t border-slate-200 bg-white px-3 py-2 font-mono text-xs leading-relaxed text-slate-700 focus:outline-none focus:ring-0">' + esc(ev.text) + '</textarea></details>' +
+      '<button data-action="ev-run" class="' + BTN_PRI + ' mt-4 w-full !py-2.5"' + (v && !busy ? '' : ' disabled') + '>' + ic('sparkles') + 'Analizar perfil</button></section>';
+  var right;
+  if (ev.status === 'analyzing') {
+    var steps = ['Extrayendo y limpiando el texto', 'Normalizando tildes y mayúsculas', 'Comparando con los requisitos de la vacante', 'Construyendo el scorecard'];
+    right = '<section class="card flex min-h-[420px] flex-col items-center justify-center p-8"><span class="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">' + ic('loader-2', 'spin h-7 w-7') + '</span><h2 class="mt-4 font-display text-lg font-bold text-slate-900">Analizando el perfil…</h2><ul class="mt-5 w-full max-w-sm space-y-2.5">' + steps.map(function (st, i) { var done = i < ev.step, now = i === ev.step; return '<li class="flex items-center gap-2.5 text-sm ' + (done ? 'text-slate-700' : (now ? 'font-medium text-indigo-700' : 'text-slate-400')) + '">' + (done ? ic('check-circle-2', 'h-4 w-4 text-emerald-500') : (now ? ic('loader-2', 'spin h-4 w-4') : ic('circle', 'h-4 w-4'))) + st + '</li>'; }).join('') + '</ul></section>';
+  } else if (ev.status === 'done' && ev.result) {
+    var r = ev.result, C = 2 * Math.PI * 54, color = r.tier === 'alto' ? '#10B981' : (r.tier === 'medio' ? '#F59E0B' : '#EF4444');
+    var tierCls = r.tier === 'alto' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : (r.tier === 'medio' ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-red-50 text-red-700 ring-red-200');
+    right = '<section class="card overflow-hidden"><div class="flex flex-wrap items-center gap-6 border-b border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6"><div class="relative h-36 w-36 flex-none"><svg viewBox="0 0 120 120" class="h-full w-full -rotate-90" role="img" aria-label="Puntaje de ajuste ' + r.score + ' por ciento"><circle cx="60" cy="60" r="54" fill="none" stroke="#E2E8F0" stroke-width="10"/><circle id="gauge-ring" class="gauge-ring" cx="60" cy="60" r="54" fill="none" stroke="' + color + '" stroke-width="10" stroke-linecap="round" stroke-dasharray="' + C.toFixed(2) + '" stroke-dashoffset="' + C.toFixed(2) + '"/></svg><div class="absolute inset-0 flex flex-col items-center justify-center"><p class="tnum font-display text-4xl font-extrabold text-slate-900"><span id="gauge-num">0</span><span class="text-xl text-slate-400">%</span></p><p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Ajuste global</p></div></div><div class="min-w-0 flex-1 basis-56"><span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ' + tierCls + '">' + ic(r.tier === 'bajo' ? 'alert-triangle' : 'check-circle-2', 'h-3.5 w-3.5') + esc(r.diag.title) + '</span><h2 class="mt-2 font-display text-lg font-bold text-slate-900">Scorecard · ' + esc(v ? v.title : '') + '</h2><p class="tnum mt-1 text-sm text-slate-500">' + r.found.length + ' de ' + r.total + ' requisitos encontrados · ' + r.words.toLocaleString('es-CO') + ' palabras analizadas</p></div></div><div class="space-y-6 p-6">' +
+        '<div><p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Matriz de palabras clave</p><div class="flex flex-wrap gap-1.5">' + r.found.map(function (x) { return '<span class="tnum inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">' + ic('check', 'h-3 w-3') + esc(x.keyword) + (x.count > 1 ? ' <span class="text-emerald-500">×' + x.count + '</span>' : '') + '</span>'; }).join('') + r.missing.map(function (x) { return '<span class="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 ring-1 ring-red-200">' + ic('x', 'h-3 w-3 text-red-400') + esc(x.keyword) + '</span>'; }).join('') + '</div>' +
+          (r.extra.length ? '<p class="mb-1.5 mt-3 text-[11px] font-medium text-slate-500">Otras señales operativas detectadas (no suman al puntaje)</p><div class="flex flex-wrap gap-1.5">' + r.extra.map(function (k) { return '<span class="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200">' + ic('plus', 'h-3 w-3') + esc(k) + '</span>'; }).join('') + '</div>' : '') + '</div>' +
+        '<div><p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Diagnóstico ejecutivo</p><p class="text-sm leading-relaxed text-slate-700">' + esc(r.diag.text) + '</p><div class="mt-3 grid gap-3 sm:grid-cols-2"><div class="rounded-xl bg-emerald-50/60 p-3"><p class="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">' + ic('trending-up', 'h-3.5 w-3.5') + 'Fortalezas</p><ul class="mt-1.5 list-disc space-y-0.5 pl-4 text-xs text-slate-700">' + (r.strengths.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') || '<li class="text-slate-400">Ningún requisito encontrado</li>') + '</ul></div><div class="rounded-xl bg-red-50/60 p-3"><p class="flex items-center gap-1.5 text-xs font-semibold text-red-700">' + ic('alert-triangle', 'h-3.5 w-3.5') + 'Brechas por validar</p><ul class="mt-1.5 list-disc space-y-0.5 pl-4 text-xs text-slate-700">' + (r.gaps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') || '<li class="text-slate-400">Sin brechas detectadas</li>') + '</ul></div></div><p class="tnum mt-3 flex items-center gap-1.5 text-xs text-slate-600">' + ic('calendar', 'h-3.5 w-3.5 text-slate-400') + (r.years.best ? 'Experiencia detectada: <b>' + plural(r.years.best, 'año', 'años') + '</b> ' + (r.years.mentioned ? '(mencionados en el texto)' : '(estimados por rangos de fechas)') : 'No se detectaron años de experiencia en el texto') + '</p></div>' +
+        '<form id="form-ev-register" class="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-4"><p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Datos detectados · revise antes de registrar</p><div class="grid gap-3 sm:grid-cols-2">' + field('Nombre', '<input name="name" required maxlength="90" value="' + esc(r.contact.name) + '" placeholder="No detectado: escríbalo" class="' + INPUT + '">') + field('Fuente', '<select name="source" class="' + INPUT + '">' + options(SOURCES, SOURCES[0]) + '</select>') + field('Email', '<input name="email" type="email" maxlength="90" value="' + esc(r.contact.email) + '" placeholder="No detectado" class="' + INPUT + '">') + field('Teléfono', '<input name="phone" maxlength="24" value="' + esc(r.contact.phone) + '" placeholder="No detectado" class="' + INPUT + '">') + '</div><label class="mt-3 flex items-start gap-2 text-xs text-slate-600"><input name="consent" type="checkbox" required class="mt-0.5 rounded border-slate-300 text-indigo-600"><span>El candidato autorizó el tratamiento de sus datos para este proceso (Ley 1581 de 2012).</span></label><button type="submit" class="' + BTN_PRI + ' mt-4 w-full !py-2.5">' + ic('user-plus') + 'Registrar candidato en Preselección</button></form>' +
+        '<p class="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-[11px] leading-relaxed text-slate-500">' + ic('info', 'mt-0.5 h-3.5 w-3.5 flex-none') + '<span><b>Cómo se calcula:</b> el puntaje es el porcentaje de requisitos de la vacante que aparecen escritos en el CV (sin distinguir tildes, mayúsculas ni plurales). Es coincidencia de términos, no interpreta el contexto. Úselo para priorizar la revisión; la decisión corresponde al equipo de selección.</span></p></div></section>';
+  } else {
+    right = '<section class="card flex min-h-[420px] flex-col items-center justify-center p-8 text-center"><span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">' + ic('scan-search', 'h-7 w-7') + '</span><h2 class="mt-4 font-display text-lg font-bold text-slate-900">El scorecard aparecerá aquí</h2><p class="mt-1 max-w-sm text-sm text-slate-500">Seleccione una vacante, cargue un CV en PDF o TXT y ejecute el análisis.</p></section>';
+  }
+  return pageHead('Evaluador IA de Perfiles', 'Compare una hoja de vida con los requisitos de la vacante y registre al candidato con su puntaje.', '') + '<div class="grid gap-4 xl:grid-cols-5"><div class="xl:col-span-2">' + left + '</div><div class="xl:col-span-3">' + right + '</div></div>';
+}
+
+/* =====================================================================
+   13. MODALES
+   ===================================================================== */
+function modalHead(title, sub) { return '<div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4"><div><h2 id="modal-title" class="font-display text-lg font-bold text-slate-900">' + esc(title) + '</h2>' + (sub ? '<p class="mt-0.5 text-sm text-slate-500">' + esc(sub) + '</p>' : '') + '</div><button type="button" data-action="close-modal" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Cerrar">' + ic('x', 'h-5 w-5') + '</button></div>'; }
+function modalFoot(html) { return '<div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4">' + html + '</div>'; }
+function openModal(html, wide) {
+  ui.notifOpen = false; $('#notif-panel').hidden = true;
+  $('#modal-root').innerHTML = '<div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm sm:p-8" data-backdrop="1"><div class="card fade-in my-auto w-full ' + (wide ? 'max-w-4xl' : 'max-w-2xl') + ' overflow-hidden !shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="modal-title">' + html + '</div></div>';
+  icons();
+  var first = $('#modal-root input:not([type=hidden]), #modal-root select, #modal-root textarea'); if (first && !wide) first.focus();
+}
+function closeModal() { $('#modal-root').innerHTML = ''; }
+function modalOpen() { return !!$('#modal-root').innerHTML; }
+function confirmModal(title, text, label, action) { openModal(modalHead(title, '') + '<p class="px-6 py-5 text-sm text-slate-600">' + esc(text) + '</p>' + modalFoot('<button data-action="close-modal" class="' + BTN_SEC + '">Cancelar</button><button data-action="' + action + '" class="' + BTN + 'bg-red-600 text-white hover:bg-red-700">' + esc(label) + '</button>')); }
+
+/* =====================================================================
+   14. EVENTOS
+   ===================================================================== */
+var VIEWS = { dashboard: viewDashboard, vacantes: viewVacantes, pipeline: viewPipeline, evaluador: viewEvaluador, contratacion: viewContratacion, rotacion: viewRotacion, copiloto: viewCopiloto };
+var pendingId = null, pendingBackup = null;
+
+document.addEventListener('click', function (e) {
+  if (e.target.getAttribute && e.target.getAttribute('data-backdrop')) { closeModal(); return; }
+  if (e.target.id === 'backdrop') { closeSidebar(); return; }
+  var b = e.target.closest('[data-action]');
+  if (!b) {
+    if (ui.notifOpen && !e.target.closest('#notif-panel')) { ui.notifOpen = false; renderChrome(); icons(); }
+    if (!e.target.closest('#search-results') && e.target.id !== 'global-search') $('#search-results').hidden = true;
+    return;
+  }
+  if (b.disabled) return;
+  var a = b.dataset.action, id = b.dataset.id, c, emp, n;
+  if (a !== 'toggle-notif' && a !== 'notif-read' && ui.notifOpen) ui.notifOpen = false;
+  switch (a) {
+    case 'nav': closeModal(); $('#search-results').hidden = true; go(b.dataset.view); break;
+    case 'toggle-sidebar': $('#sidebar').classList.toggle('-translate-x-full'); $('#backdrop').hidden = $('#sidebar').classList.contains('-translate-x-full'); break;
+    case 'toggle-notif': ui.notifOpen = !ui.notifOpen; renderChrome(); icons(); break;
+    case 'notif-read': state.read = allAlerts().map(function (x) { return x.key; }); save(); renderChrome(); icons(); break;
+    case 'toggle-filter': ui.filters[b.dataset.filter] = !ui.filters[b.dataset.filter]; if (b.dataset.filter === 'unscored' && ui.filters.unscored) ui.filters.high = false; if (b.dataset.filter === 'high' && ui.filters.high) ui.filters.unscored = false; ui.view = 'pipeline'; render(); break;
+    case 'clear-filters': ui.filters = { overdue: false, high: false, unscored: false }; render(); break;
+    case 'load-demo': if (!isEmpty()) break; state = seed(); save(); ui.pipeVac = ''; ui.ev = freshEv(); ui.cop = freshCop(); closeModal(); render(); toast('Datos de ejemplo cargados. Bórrelos antes de registrar información real.', 'ok'); break;
+    case 'wipe': confirmModal('Borrar todos los datos', 'Se eliminarán de forma definitiva las ' + state.vacancies.length + ' vacantes, ' + state.candidates.length + ' candidatos y ' + state.employees.length + ' colaboradores. Exporte un respaldo antes si los necesita.', 'Borrar todo', 'wipe-yes'); break;
+    case 'wipe-yes': state = emptyState(); save(); ui.pipeVac = ''; ui.ev = freshEv(); ui.cop = freshCop(); closeModal(); ui.view = 'dashboard'; render(); toast('Datos eliminados. El sistema quedó vacío.', 'ok'); break;
+    case 'export': (function () { var blob = new Blob([JSON.stringify({ app: 'TalentOS HR', exportedAt: today(), state: state }, null, 1)], { type: 'application/json' }), link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'talentos-hr-respaldo-' + today() + '.json'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(function () { URL.revokeObjectURL(link.href); }, 3000); toast('Respaldo descargado. Guárdelo en un lugar seguro: contiene datos personales.', 'ok'); })(); break;
+    case 'logout': closeModal(); closeSidebar(); (store.sb ? store.sb.auth.signOut() : Promise.resolve()).catch(function () {}).then(function () { state = emptyState(); store.cache = {}; store.uid = null; store.email = ''; store.authError = ''; store.mode = 'login'; ui.view = 'dashboard'; render(); }); break;
+    case 'retry': boot(); break;
+    case 'reset-cfg': try { localStorage.removeItem(CFG_KEY); } catch (err2) { /* sin almacenamiento */ } store.sb = null; store.authError = ''; store.mode = 'setup'; render(); break;
+    case 'backup-yes': if (pendingBackup) { state = normalizeState(pendingBackup); pendingBackup = null; save(); closeModal(); render(); toast('Respaldo restaurado.', 'ok'); } break;
+    case 'new-emp': openEmployeeModal(); break;
+    case 'import-emp': closeSidebar(); openImportModal(); break;
+    case 'close-modal': closeModal(); break;
+    case 'new-vac': openVacancyModal(); break;
+    case 'edit-vac': openVacancyModal(id); break;
+    case 'kw-del': ui.draftKeywords.splice(Number(b.dataset.i), 1); refreshKeywords(); break;
+    case 'kw-add': addKeywords(b.dataset.kw); break;
+    case 'go-pipeline': ui.pipeVac = id || ''; closeModal(); $('#search-results').hidden = true; go('pipeline'); break;
+    case 'go-eval': ui.ev = freshEv(); ui.ev.vacId = id; go('evaluador'); break;
+    case 'new-cand': openCandidateForm(); break;
+    case 'open-cand': $('#search-results').hidden = true; renderChrome(); openCandidate(id); break;
+    case 'advance': c = candById(id); if (c) { moveCandidate(id, c.stage + 1); render(); } break;
+    case 'move': var wasOpen = modalOpen(); moveCandidate(id, Number(b.dataset.to)); render(); if (wasOpen) openCandidate(id); break;
+    case 'add-note': c = candById(id); var inp = $('#note-input'); if (c && inp.value.trim()) { c.notesLog.push({ date: today(), text: inp.value.trim() }); save(); openCandidate(id); toast('Nota agregada.', 'ok'); } break;
+    case 'save-history':
+      c = candById(id); if (!c) break;
+      var dates = c.history.map(function (h, i) { return $('[data-hdate="' + i + '"]').value || h.date; });
+      for (var i = 1; i < dates.length; i++) if (dayNum(dates[i]) < dayNum(dates[i - 1])) { toast('Las fechas deben ir en orden: una etapa no puede empezar antes que la anterior.', 'warn'); return; }
+      if (dayNum(dates[dates.length - 1]) > dayNum(today())) { toast('La fecha de la etapa actual no puede ser futura.', 'warn'); return; }
+      c.history.forEach(function (h, i) { h.date = dates[i]; h.note = $('[data-hnote="' + i + '"]').value.trim(); });
+      c.createdAt = dates[0]; c.stageSince = dates[dates.length - 1]; save(); render(); openCandidate(id); toast('Trazabilidad actualizada. Las alertas se recalcularon.', 'ok'); break;
+    case 'del-cand': pendingId = id; c = candById(id); confirmModal('Eliminar candidato', 'Se eliminará el registro de ' + (c ? c.name : 'este candidato') + ' con su historial y notas. Esta acción no se puede deshacer.', 'Eliminar', 'del-yes'); break;
+    case 'del-yes': state.candidates = state.candidates.filter(function (x) { return x.id !== pendingId; }); pendingId = null; save(); closeModal(); render(); toast('Registro eliminado.', 'ok'); break;
+    case 'toggle-step':
+      c = candById(id); if (!c || !c.hiring) break;
+      var st = c.hiring.steps[Number(b.dataset.step)]; st.done = !st.done; st.date = st.done ? today() : ''; save(); render();
+      if (hiringRisk(c).level === 'ready') toast(c.name + ' completó los 5 hitos. Ya puede activarse en nómina y operación.', 'ok'); break;
+    case 'contact': openContactModal(id); break;
+    case 'activate': activateCandidate(id); render(); break;
+    case 'no-show': pendingId = id; c = candById(id); confirmModal('Registrar que desistió', (c ? c.name : 'El candidato') + ' se cerrará como "Desistió" antes del ingreso. El cupo de la vacante sigue abierto.', 'Registrar deserción', 'no-show-yes'); break;
+    case 'no-show-yes': c = candById(pendingId); pendingId = null; if (c) { c.stage = 6; c.stageSince = today(); c.outcome = 'Desistió'; c.history.push({ stage: 6, date: today(), note: 'Cierre: Desistió antes del ingreso' }); save(); } closeModal(); render(); toast('Deserción registrada. Revise el pipeline para reemplazar el cupo.', 'warn'); break;
+    case 'new-exit': openExitModal(id); break;
+    case 'toggle-check': emp = empById(id); if (emp && emp.retention) { emp.retention.checks[b.dataset.check] = !emp.retention.checks[b.dataset.check]; save(); render(); } break;
+    case 'apply-one': n = applyChecklist(id); render(); if (n) toast('Checklist 30-60-90 aplicado.', 'ok'); break;
+    case 'apply-checklist': n = applyChecklist(); render(); toast(n ? 'Checklist 30-60-90 aplicado a ' + plural(n, 'colaborador', 'colaboradores') + ' en sus primeros 90 días. Sígalo en Rotación y Retención.' : 'Todos los nuevos ingresos ya tienen el checklist.', n ? 'ok' : 'info'); break;
+    case 'cop-run': runCopilot(); break;
+    case 'ev-sample': var v = vacById(ui.ev.vacId); if (v) { ui.ev.text = sampleCV(v); ui.ev.fileName = 'CV de ejemplo.txt'; ui.ev.pages = 0; ui.ev.result = null; ui.ev.status = 'idle'; ui.ev.error = ''; render(); } break;
+    case 'ev-clear': var keep = ui.ev.vacId; ui.ev = freshEv(); ui.ev.vacId = keep; render(); break;
+    case 'ev-run': runAnalysis(); break;
+  }
+});
+
+document.addEventListener('submit', function (e) {
+  e.preventDefault();
+  var f = e.target, d = {}; new FormData(f).forEach(function (v, k) { d[k] = typeof v === 'string' ? v.trim() : v; });
+  var t = today(), c, v;
+  if (f.id === 'form-setup') {
+    var url = d.url.replace(/\/+$/, ''), key = d.key.replace(/\s+/g, '');
+    if (!/^https:\/\/[a-z0-9.-]+$/i.test(url)) { store.authError = 'La dirección debe ser como https://xxxxxxxx.supabase.co'; render(); return; }
+    if (/service_role|sb_secret_/i.test(key)) { store.authError = 'Esa es una clave secreta. Use la clave pública (anon o publishable).'; render(); return; }
+    try { localStorage.setItem(CFG_KEY, JSON.stringify({ url: url, key: key })); } catch (err3) { /* se usa solo en esta sesión */ }
+    connect({ url: url, key: key }); return;
+  }
+  if (f.id === 'form-login') {
+    var btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    store.sb.auth.signInWithPassword({ email: d.email, password: f.elements.password.value }).then(function (r) {
+      if (r.error || !r.data || !r.data.session) { store.authError = /invalid login|credentials/i.test((r.error && r.error.message) || '') ? 'Correo o clave incorrectos.' : 'No se pudo iniciar sesión. Revise la conexión y los datos del proyecto.'; store.mode = 'login'; g0(); return; }
+      enter(r.data.session);
+    }).catch(function () { store.authError = 'No se pudo conectar con Supabase. Revise la dirección del proyecto.'; g0(); });
+    return;
+  }
+  if (f.id === 'form-sla') {
+    state.sla = [0, 1, 2, 3, 4, 5].map(function (i) { return Math.min(60, Math.max(1, Math.round(Number(d['sla' + i])) || 1)); });
+    save(); render(); toast('Tiempos límite guardados. Las alertas se recalcularon.', 'ok');
+  } else if (f.id === 'form-costs') {
+    state.costs = { op: Math.max(0, Number(d.op) || 0), adm: Math.max(0, Number(d.adm) || 0) }; save(); render(); toast('Costo de reemplazo actualizado.', 'ok');
+  } else if (f.id === 'form-vac') {
+    var pending = $('#kw-input').value.trim(); if (pending) addKeywords(pending);
+    if (!ui.draftKeywords.length) { toast('Agregue al menos una palabra clave para poder evaluar hojas de vida.', 'warn'); $('#kw-input').focus(); return; }
+    if (dayNum(d.deadline) < dayNum(d.openDate)) { toast('La fecha límite no puede ser anterior a la apertura.', 'warn'); return; }
+    var old = vacById(f.dataset.id), data = { title: d.title, type: d.type, area: d.area || 'Sin área', slots: Math.max(1, Math.round(Number(d.slots)) || 1), description: d.description, keywords: ui.draftKeywords.slice(), openDate: d.openDate, deadline: d.deadline, startDate: d.startDate, recruiter: d.recruiter, status: d.status };
+    if (old) Object.assign(old, data); else { data.id = uid('v'); data.filledBase = 0; state.vacancies.unshift(data); }
+    save(); closeModal(); ui.vacSearch = ''; ui.vacStatus = ''; ui.vacType = ''; ui.view = 'vacantes'; render(); toast(old ? 'Vacante actualizada.' : 'Vacante creada: ' + d.title + ' (' + plural(data.slots, 'cupo', 'cupos') + ').', 'ok');
+  } else if (f.id === 'form-cand') {
+    state.candidates.push({ id: uid('c'), name: d.name, email: d.email, phone: d.phone, source: d.source, notes: d.notes, vacancyId: d.vacancyId, stage: 0, stageSince: t, match: null, createdAt: t, outcome: null, consent: true, history: [{ stage: 0, date: t, note: 'Postulación registrada manualmente' }], notesLog: [], hiring: null });
+    save(); closeModal(); ui.pipeVac = ui.pipeVac ? d.vacancyId : ''; ui.view = 'pipeline'; render(); toast(d.name + ' quedó en Postulación.', 'ok');
+  } else if (f.id === 'form-cand-edit') {
+    c = candById(f.dataset.id); if (!c) return;
+    Object.assign(c, { name: d.name, email: d.email, phone: d.phone, source: d.source, notes: d.notes, vacancyId: d.vacancyId }); save(); render(); openCandidate(c.id); toast('Datos guardados.', 'ok');
+  } else if (f.id === 'form-contact') {
+    c = candById(f.dataset.id); if (!c || !c.hiring) return;
+    c.hiring.contacts.push({ date: t, note: d.note + (d.startDate ? ' · Ingreso reprogramado para el ' + fmtDate(d.startDate) : '') });
+    if (d.startDate) c.hiring.startDate = d.startDate;
+    save(); closeModal(); render(); toast('Contacto registrado' + (d.startDate ? ' e ingreso reprogramado' : '') + '.', 'ok');
+  } else if (f.id === 'form-emp') {
+    if (dayNum(d.hireDate) > dayNum(t)) { toast('La fecha de ingreso no puede ser futura.', 'warn'); return; }
+    state.employees.push(newEmp(d.name, d.role, d.area, d.type, d.shift, d.hireDate)); save(); closeModal(); ui.view = 'rotacion'; render(); toast(d.name + ' se agregó a la plantilla.', 'ok');
+  } else if (f.id === 'form-import') {
+    var ok = 0, bad = 0;
+    String(d.rows || '').split(/\r?\n/).forEach(function (line, i) {
+      if (!line.trim()) return;
+      var cells = (line.indexOf('\t') >= 0 ? line.split('\t') : (line.indexOf(';') >= 0 ? line.split(';') : line.split(','))).map(function (x) { return x.trim(); });
+      if (i === 0 && /nombre/i.test(cells[0])) return;
+      var date = parseDate(cells[5]);
+      if (!cells[0] || !date || dayNum(date) > dayNum(t)) { bad++; return; }
+      var sh = SHIFTS.find(function (x) { return normalize(x) === normalize(cells[4]); });
+      state.employees.push(newEmp(cells[0].slice(0, 90), (cells[1] || 'Sin cargo').slice(0, 70), (cells[2] || 'Sin área').slice(0, 40), /adm|estrat/i.test(cells[3] || '') ? TYPES[1] : TYPES[0], sh || 'Por asignar', date)); ok++;
+    });
+    if (!ok) { toast('No se importó ninguna fila. Revise el orden de las columnas y el formato de la fecha de ingreso.', 'warn'); return; }
+    save(); closeModal(); ui.view = 'rotacion'; render(); toast(plural(ok, 'colaborador importado', 'colaboradores importados') + (bad ? ' · ' + plural(bad, 'fila omitida', 'filas omitidas') + ' por nombre o fecha inválidos' : '') + '.', bad ? 'warn' : 'ok');
+  } else if (f.id === 'form-exit') {
+    var emp = empById(d.empId); if (!emp) return;
+    if (dayNum(d.exitDate) < dayNum(emp.hireDate)) { toast('La fecha de salida no puede ser anterior al ingreso (' + fmtDate(emp.hireDate) + ').', 'warn'); return; }
+    if (dayNum(d.exitDate) > dayNum(t)) { toast('La fecha de salida no puede ser futura.', 'warn'); return; }
+    Object.assign(emp, { status: 'Retirado', exitDate: d.exitDate, exitType: d.exitType, exitReason: d.exitReason, exitNotes: d.exitNotes });
+    save(); closeModal(); ui.cop = freshCop(); ui.view = 'rotacion'; render();
+    toast(emp.name + ' quedó como Retirado' + (tenure(emp) < 90 ? ' (rotación temprana: ' + tenure(emp) + ' días)' : '') + '. Tasas y gráficos recalculados.', 'ok');
+  } else if (f.id === 'form-ev-register') {
+    var ev = ui.ev, r = ev.result; v = vacById(ev.vacId); if (!r || !v) return;
+    var nc = { id: uid('c'), name: d.name, email: d.email, phone: d.phone, source: d.source, vacancyId: v.id, stage: 1, stageSince: t, match: r.score, createdAt: t, outcome: null, consent: true, hiring: null,
+      notes: r.diag.title + ' (' + r.score + '%). Coincidencias: ' + (r.found.map(function (x) { return x.keyword; }).join(', ') || 'ninguna') + '. Brechas: ' + (r.missing.map(function (x) { return x.keyword; }).join(', ') || 'ninguna') + '.' + (r.years.best ? ' Experiencia detectada: ' + plural(r.years.best, 'año', 'años') + '.' : ''),
+      history: [{ stage: 0, date: t, note: 'Registrado desde el Evaluador IA' + (ev.fileName ? ' · ' + ev.fileName : '') }, { stage: 1, date: t, note: 'Enviado a Preselección con match de ' + r.score + '%' }], notesLog: [] };
+    state.candidates.push(nc); save(); ui.ev = freshEv(); ui.ev.vacId = v.id; ui.pipeVac = v.id; ui.filters = { overdue: false, high: false, unscored: false }; go('pipeline');
+    toast(nc.name + ' quedó en Preselección con ' + r.score + '% de match.', 'ok');
+  }
+});
+
+function g0() { var g = $('#gate'); if (g) g.dataset.sig = ''; render(); }
+function addKeywords(raw) {
+  raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (k) { if (ui.draftKeywords.length < 25 && !ui.draftKeywords.some(function (x) { return normalize(x) === normalize(k); })) ui.draftKeywords.push(k.slice(0, 50)); });
+  refreshKeywords();
+}
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') { if (modalOpen()) closeModal(); else if (ui.notifOpen) { ui.notifOpen = false; renderChrome(); icons(); } $('#search-results').hidden = true; }
+  if (e.target.id === 'kw-input') {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addKeywords(e.target.value); e.target.value = ''; }
+    else if (e.key === 'Backspace' && !e.target.value && ui.draftKeywords.length) { ui.draftKeywords.pop(); refreshKeywords(); }
+  }
+});
+document.addEventListener('input', function (e) {
+  var t = e.target;
+  if (t.id === 'vac-search') { ui.vacSearch = t.value; $('#vac-grid').innerHTML = vacancyCards(); icons(); }
+  else if (t.id === 'ev-text') ui.ev.text = t.value;
+  else if (t.id === 'global-search') renderSearch(t.value);
+  else if (t.id === 'cop-target') { ui.cop.target = t.value; $('#cop-impact').innerHTML = impactHtml(retentionDiagnosis()); }
+});
+document.addEventListener('change', function (e) {
+  var t = e.target, c;
+  if (t.id === 'vac-status') { ui.vacStatus = t.value; $('#vac-grid').innerHTML = vacancyCards(); icons(); }
+  else if (t.id === 'vac-type') { ui.vacType = t.value; $('#vac-grid').innerHTML = vacancyCards(); icons(); }
+  else if (t.id === 'pipe-vac') { ui.pipeVac = t.value; render(); }
+  else if (t.id === 'dir-status' || t.id === 'dir-area') { if (t.id === 'dir-status') ui.dirStatus = t.value; else ui.dirArea = t.value; $('#dir-body').innerHTML = directoryRows(); icons(); }
+  else if (t.id === 'cop-focus') ui.cop.focus = t.value;
+  else if (t.id === 'cop-budget') ui.cop.budget = Number(t.value);
+  else if (t.id === 'ev-vac') { ui.ev.vacId = t.value; ui.ev.result = null; if (ui.ev.status === 'done') ui.ev.status = 'idle'; var ta = $('#ev-text'); if (ta) ui.ev.text = ta.value; render(); }
+  else if (t.id === 'ev-file') handleFile(t.files[0]);
+  else if (t.id === 'backup-file' && t.files[0]) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var obj = null; try { obj = JSON.parse(String(fr.result || '')); } catch (err) { obj = null; }
+      var data = obj && obj.state ? obj.state : obj;
+      if (!validState(data)) { toast('El archivo no es un respaldo válido de TalentOS HR.', 'warn'); return; }
+      pendingBackup = data; closeSidebar();
+      confirmModal('Restaurar respaldo', 'Se reemplazarán todos los datos actuales por los del respaldo: ' + data.vacancies.length + ' vacantes, ' + data.candidates.length + ' candidatos y ' + data.employees.length + ' colaboradores.', 'Restaurar', 'backup-yes');
+    };
+    fr.readAsText(t.files[0], 'UTF-8'); t.value = '';
+  }
+  else if (t.id === 'cand-outcome') { c = candById(t.dataset.id); if (c) { c.outcome = t.value; c.history[c.history.length - 1].note = 'Cierre: ' + t.value; save(); render(); openCandidate(c.id); } }
+  else if (t.dataset && t.dataset.start) { c = candById(t.dataset.start); if (c && c.hiring && t.value) { c.hiring.startDate = t.value; save(); render(); toast('Fecha de ingreso actualizada.', 'ok'); } }
+});
+$('#global-search').addEventListener('focus', function (e) { if (e.target.value.trim()) renderSearch(e.target.value); });
+function renderSearch(q) {
+  var box = $('#search-results'), n = normalize(q).trim();
+  if (!n) { box.hidden = true; return; }
+  var cs = state.candidates.filter(function (c) { return normalize(c.name + ' ' + c.email + ' ' + c.phone).indexOf(n) >= 0; }).slice(0, 5);
+  var vs = state.vacancies.filter(function (v) { return normalize(v.title + ' ' + v.recruiter + ' ' + v.area + ' ' + v.keywords.join(' ')).indexOf(n) >= 0; }).slice(0, 4);
+  var es = state.employees.filter(function (x) { return normalize(x.name + ' ' + x.role + ' ' + x.area).indexOf(n) >= 0; }).slice(0, 4);
+  var head = function (t) { return '<p class="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + t + '</p>'; }, html = '';
+  if (cs.length) html += head('Candidatos') + cs.map(function (c) { var v = vacById(c.vacancyId); return '<button data-action="open-cand" data-id="' + c.id + '" class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-slate-50">' + avatar(c.name, 'h-8 w-8 text-[11px]') + '<span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium text-slate-800">' + esc(c.name) + '</span><span class="block truncate text-xs text-slate-500">' + esc(STAGES[c.stage]) + (v ? ' · ' + esc(v.title) : '') + '</span></span>' + matchBadge(c.match) + '</button>'; }).join('');
+  if (vs.length) html += head('Vacantes') + vs.map(function (v) { return '<button data-action="go-pipeline" data-id="' + v.id + '" class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-slate-50"><span class="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">' + ic('briefcase', 'h-4 w-4') + '</span><span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium text-slate-800">' + esc(v.title) + '</span><span class="block truncate text-xs text-slate-500">' + esc(v.area) + ' · ' + esc(v.status) + '</span></span></button>'; }).join('');
+  if (es.length) html += head('Colaboradores') + es.map(function (x) { return '<button data-action="nav" data-view="rotacion" class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-slate-50">' + avatar(x.name, 'h-8 w-8 text-[11px]') + '<span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium text-slate-800">' + esc(x.name) + '</span><span class="block truncate text-xs text-slate-500">' + esc(x.role) + ' · ' + esc(x.status) + '</span></span></button>'; }).join('');
+  box.innerHTML = html || '<p class="px-3 py-4 text-center text-sm text-slate-500">Sin resultados para "' + esc(q) + '".</p>';
+  box.hidden = false; icons();
+}
+
+/* Arrastrar y soltar (HTML5) */
+var dragId = null;
+document.addEventListener('dragstart', function (e) { var card = e.target.closest && e.target.closest('.kcard'); if (!card) return; dragId = card.dataset.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); });
+document.addEventListener('dragend', function () { dragId = null; document.querySelectorAll('.dragging, .drag-over, .is-over').forEach(function (el) { el.classList.remove('dragging', 'drag-over', 'is-over'); }); });
+document.addEventListener('dragover', function (e) {
+  var col = e.target.closest && e.target.closest('.kcol'), dz = e.target.closest && e.target.closest('#dropzone');
+  if (col && dragId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; document.querySelectorAll('.kcol.drag-over').forEach(function (el) { if (el !== col) el.classList.remove('drag-over'); }); col.classList.add('drag-over'); }
+  else if (dz) { e.preventDefault(); dz.classList.add('is-over'); }
+});
+document.addEventListener('dragleave', function (e) { var dz = e.target.closest && e.target.closest('#dropzone'); if (dz && !dz.contains(e.relatedTarget)) dz.classList.remove('is-over'); });
+document.addEventListener('drop', function (e) {
+  var col = e.target.closest && e.target.closest('.kcol'), dz = e.target.closest && e.target.closest('#dropzone');
+  if (col && dragId) { e.preventDefault(); var id = dragId; dragId = null; moveCandidate(id, Number(col.dataset.stage)); render(); }
+  else if (dz) { e.preventDefault(); dz.classList.remove('is-over'); if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }
+});
+
+boot();
+})();
+</script>
+
+</body>
+</html>
