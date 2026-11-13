@@ -236,8 +236,8 @@ function normalizeState(d) {
 }
 /* Conexión con Supabase. Opcional: escriba aquí la dirección del proyecto y la clave pública (anon / publishable)
    para no tener que ingresarlas en cada equipo. Nunca use la clave "service_role". */
-var SUPABASE_URL = '';
-var SUPABASE_KEY = '';
+var SUPABASE_URL = 'https://ztujvajarzkrbwinjauo.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_PPJG8CS05pDcuCgK9Gvtiw_uGnhb40H';
 var CFG_KEY = 'talentos_hr_supabase', TABLE = 'talentos_docs';
 var CHUNK = 40, COLS = ['vacancies', 'candidates', 'employees'];
 var store = { mode: 'loading', sb: null, uid: null, email: '', cache: {}, queue: Promise.resolve(), pending: 0, failed: false, slow: false, authError: '' };
@@ -328,9 +328,9 @@ function renderGate() {
       field('Dirección del proyecto (Project URL)', '<input name="url" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" required placeholder="https://xxxxxxxx.supabase.co" autocomplete="off" class="' + INPUT + '">') +
       field('Clave pública (publishable)', '<textarea name="key" rows="3" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="sb_publishable_…" class="' + INPUT + ' font-mono text-xs"></textarea>') +
       '<p class="text-[11px] leading-relaxed text-slate-500">Las encuentra en Supabase con el botón Connect o en Settings → API Keys. Puede pegar la línea completa tal como la copia: aquí se toma solo la dirección y la clave. Use la clave pública (publishable); nunca la clave "secret" o "service_role".</p><button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('plug') + 'Conectar</button></form>';
-    else if (store.mode === 'login') inner = err + '<form id="form-login" class="space-y-4">' + field('Correo', '<input name="email" type="email" required autocomplete="username" class="' + INPUT + '">') + field('Clave', '<input name="password" type="password" required autocomplete="current-password" class="' + INPUT + '">') + '<button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('log-in') + 'Ingresar</button></form>' + (cfg && !cfg.fixed ? '<button data-action="reset-cfg" class="mt-4 w-full text-center text-xs text-slate-400 hover:text-slate-600">Cambiar el proyecto de Supabase</button>' : '');
+    else if (store.mode === 'login') inner = err + '<form id="form-login" class="space-y-4">' + field('Correo', '<input name="email" type="email" required autocomplete="username" value="' + esc(store.lastEmail || '') + '" class="' + INPUT + '">') + field('Clave', '<input name="password" type="password" required autocomplete="current-password" class="' + INPUT + '">') + '<button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('log-in') + 'Ingresar</button></form>' + (cfg && !cfg.fixed ? '<button data-action="reset-cfg" class="mt-4 w-full text-center text-xs text-slate-400 hover:text-slate-600">Cambiar el proyecto de Supabase</button>' : '');
     else inner = err + '<div class="flex flex-wrap gap-2"><button data-action="retry" class="' + BTN_PRI + ' flex-1">' + ic('refresh-cw') + 'Reintentar</button>' + (store.sb ? '<button data-action="logout" class="' + BTN_SEC + ' flex-1">Cerrar sesión</button>' : '') + '</div>';
-    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div><span class="tnum ml-auto self-start rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">v1.1</span></div>' + inner + '</div></div>';
+    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div><span class="tnum ml-auto self-start rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">v1.2</span></div>' + inner + '</div></div>';
     g.dataset.sig = sig; icons();
   }
   g.hidden = false;
@@ -567,7 +567,7 @@ function renderChrome() {
 function renderSideFoot() {
   var el = $('#side-foot'); if (!el) return;
   var SB = 'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white';
-  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos. <span class="tnum text-slate-500">v1.1</span></div>' +
+  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos. <span class="tnum text-slate-500">v1.2</span></div>' +
     (store.mode !== 'remote' ? '' : '<button data-action="export" class="' + SB + '">' + ic('download', 'h-3.5 w-3.5') + 'Exportar respaldo</button>' +
       '<label class="' + SB + ' cursor-pointer">' + ic('upload', 'h-3.5 w-3.5') + 'Restaurar respaldo<input id="backup-file" type="file" accept=".json,application/json" class="sr-only"></label>' +
       (isEmpty() ? '<button data-action="load-demo" class="' + SB + '">' + ic('flask-conical', 'h-3.5 w-3.5') + 'Cargar datos de ejemplo</button>' : '<button data-action="wipe" class="' + SB + '">' + ic('trash-2', 'h-3.5 w-3.5') + 'Borrar todos los datos</button>') +
@@ -1208,7 +1208,7 @@ document.addEventListener('submit', function (e) {
     connect({ url: url, key: key }); return;
   }
   if (f.id === 'form-login') {
-    var btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    var btn = f.querySelector('button[type=submit]'); btn.disabled = true; store.lastEmail = d.email || '';
     store.sb.auth.signInWithPassword({ email: d.email, password: f.elements.password.value }).then(function (r) {
       if (r.error || !r.data || !r.data.session) { store.authError = /invalid login|credentials/i.test((r.error && r.error.message) || '') ? 'Correo o clave incorrectos.' : 'No se pudo iniciar sesión. Revise la conexión y los datos del proyecto.'; store.mode = 'login'; g0(); return; }
       enter(r.data.session);
