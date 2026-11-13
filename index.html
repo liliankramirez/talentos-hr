@@ -333,7 +333,7 @@ function renderGate() {
       '<p class="text-[11px] leading-relaxed text-slate-500">Las encuentra en Supabase con el botón Connect o en Settings → API Keys. Puede pegar la línea completa tal como la copia: aquí se toma solo la dirección y la clave. Use la clave pública (publishable); nunca la clave "secret" o "service_role".</p><button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('plug') + 'Conectar</button></form>';
     else if (store.mode === 'login') inner = err + '<form id="form-login" class="space-y-4">' + field('Correo', '<input name="email" type="email" required autocomplete="username" value="' + esc(store.lastEmail || '') + '" class="' + INPUT + '">') + field('Clave', '<input name="password" type="password" required autocomplete="current-password" class="' + INPUT + '">') + '<button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('log-in') + 'Ingresar</button></form>' + (cfg && !cfg.fixed ? '<button data-action="reset-cfg" class="mt-4 w-full text-center text-xs text-slate-400 hover:text-slate-600">Cambiar el proyecto de Supabase</button>' : '');
     else inner = err + '<div class="flex flex-wrap gap-2"><button data-action="retry" class="' + BTN_PRI + ' flex-1">' + ic('refresh-cw') + 'Reintentar</button>' + (store.sb ? '<button data-action="logout" class="' + BTN_SEC + ' flex-1">Cerrar sesión</button>' : '') + '</div>';
-    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div><span class="tnum ml-auto self-start rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">v1.4</span></div>' + inner + '</div></div>';
+    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div><span class="tnum ml-auto self-start rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">v1.4.1</span></div>' + inner + '</div></div>';
     g.dataset.sig = sig; icons();
   }
   g.hidden = false;
@@ -570,7 +570,7 @@ function renderChrome() {
 function renderSideFoot() {
   var el = $('#side-foot'); if (!el) return;
   var SB = 'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white';
-  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos. <span class="tnum text-slate-500">v1.4</span></div>' +
+  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos. <span class="tnum text-slate-500">v1.4.1</span></div>' +
     (store.mode !== 'remote' ? '' : '<button data-action="export" class="' + SB + '">' + ic('download', 'h-3.5 w-3.5') + 'Exportar respaldo</button>' +
       '<label class="' + SB + ' cursor-pointer">' + ic('upload', 'h-3.5 w-3.5') + 'Restaurar respaldo<input id="backup-file" type="file" accept=".json,application/json" class="sr-only"></label>' +
       (isEmpty() ? '<button data-action="load-demo" class="' + SB + '">' + ic('flask-conical', 'h-3.5 w-3.5') + 'Cargar datos de ejemplo</button>' : '<button data-action="wipe" class="' + SB + '">' + ic('trash-2', 'h-3.5 w-3.5') + 'Borrar todos los datos</button>') +
@@ -1163,6 +1163,11 @@ function loadForms(quiet) {
   if (store.forms.status !== 'ready') store.forms.status = 'loading';
   return Promise.all([store.sb.from(T_CONV).select('*').then(checked), store.sb.from(T_POST).select('*').order('created_at', { ascending: false }).then(checked), store.sb.from(T_POST).select('correo').limit(1).then(function (r) { return !r.error; }, function () { return true; })]).then(function (rs) {
     store.forms.convs = rs[0].data || []; store.forms.posts = rs[1].data || []; store.forms.needsSql = !rs[2]; store.forms.status = 'ready'; store.forms.error = '';
+    /* Archivo de textos de autorización: si un texto publicado no está guardado con su versión (por ejemplo, porque se cambió
+       directamente en la base), se guarda ahora, para conservar la prueba de qué texto aceptó cada candidato. */
+    var av = formsState().avisos, added = false;
+    store.forms.convs.forEach(function (c) { var h = hashText(c.aviso); if (c.aviso && !av[h]) { av[h] = { text: c.aviso, date: today(), responsable: c.responsable }; added = true; } });
+    if (added) save();
   }).catch(function (e) {
     var msg = ((e && e.message) || '') + ' ' + ((e && e.code) || '');
     store.forms.status = /PGRST205|42P01|does not exist|schema cache|could not find the table/i.test(msg) ? 'missing' : 'error'; store.forms.error = msg.trim();
