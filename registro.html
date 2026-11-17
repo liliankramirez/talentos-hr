@@ -83,8 +83,8 @@
 
   function renderForm() {
     document.title = 'Registro · ' + conv.titulo;
-    /* El correo solo se pide si el texto de autorización lo incluye entre los datos que se recogen. */
-    var askMail = /correo electr[oó]nico/i.test(conv.aviso);
+    /* El correo solo se pide si la línea de datos del texto de autorización lo incluye. */
+    var askMail = /^\s*Datos[^:\n]*:[^\n]*correo electr[oó]nico/im.test(conv.aviso);
     var exp = ['No tengo experiencia en este cargo', 'Menos de 6 meses', 'Entre 6 meses y 1 año', 'Más de 1 año'];
     var disp = ['Turno de día', 'Turno de noche', 'Fines de semana y festivos', 'Puedo empezar de inmediato'];
     var src = ['WhatsApp', 'Facebook u otra red social', 'Me refirió un trabajador', 'Aviso o volante', 'Portal de empleo', 'Otro medio'];
