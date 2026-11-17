@@ -223,12 +223,13 @@ function seed() {
   ];
   return { vacancies: vacancies, candidates: candidates, employees: employees, sla: SLA_DEFAULT.slice(), costs: { op: 2500000, adm: 6000000 }, read: [], demo: true };
 }
-function emptyState() { return { vacancies: [], candidates: [], employees: [], sla: SLA_DEFAULT.slice(), costs: { op: 2500000, adm: 6000000 }, read: [], demo: false, forms: { parties: {}, avisos: {} } }; }
+function emptyState() { return { vacancies: [], candidates: [], employees: [], sla: SLA_DEFAULT.slice(), costs: { op: 2500000, adm: 6000000 }, read: [], demo: false, forms: { parties: {}, avisos: {} }, retention: { log: [] } }; }
 function validState(d) { return !!d && Array.isArray(d.vacancies) && Array.isArray(d.candidates) && Array.isArray(d.employees); }
 function normalizeState(d) {
   var e = emptyState();
   d.sla = Array.isArray(d.sla) && d.sla.length === 6 ? d.sla : e.sla; d.costs = d.costs && typeof d.costs === 'object' ? d.costs : e.costs; d.read = Array.isArray(d.read) ? d.read : []; d.demo = !!d.demo;
   d.forms = d.forms && typeof d.forms === 'object' ? d.forms : {}; d.forms.parties = d.forms.parties && typeof d.forms.parties === 'object' ? d.forms.parties : {}; d.forms.avisos = d.forms.avisos && typeof d.forms.avisos === 'object' ? d.forms.avisos : {};
+  d.retention = d.retention && typeof d.retention === 'object' ? d.retention : {}; d.retention.log = Array.isArray(d.retention.log) ? d.retention.log : [];
   d.vacancies.forEach(function (v) { v.keywords = Array.isArray(v.keywords) ? v.keywords : []; });
   d.candidates.forEach(function (c) {
     c.history = Array.isArray(c.history) && c.history.length ? c.history : [{ stage: c.stage || 0, date: c.stageSince || today(), note: '' }]; c.notesLog = Array.isArray(c.notesLog) ? c.notesLog : [];
@@ -248,7 +249,7 @@ function getCfg() {
   try { var c = JSON.parse(localStorage.getItem(CFG_KEY) || 'null'); return c && c.url && c.key ? c : null; } catch (e) { return null; }
 }
 function chunkDocs() {
-  var out = { meta: JSON.stringify({ app: 'TalentOS HR', sla: state.sla, costs: state.costs, read: state.read, demo: !!state.demo, forms: state.forms }) };
+  var out = { meta: JSON.stringify({ app: 'TalentOS HR', sla: state.sla, costs: state.costs, read: state.read, demo: !!state.demo, forms: state.forms, retention: state.retention }) };
   COLS.forEach(function (col) { for (var i = 0; i < state[col].length; i += CHUNK) out[col + '/p' + (i / CHUNK)] = JSON.stringify({ items: state[col].slice(i, i + CHUNK) }); });
   return out;
 }
@@ -304,7 +305,7 @@ function enter(session) {
       var parts = rows.filter(function (x) { return String(x.key).indexOf(col + '/p') === 0; }).map(function (x) { return { n: Number(String(x.key).split('/p')[1]) || 0, items: (x.data && x.data.items) || [] }; }).sort(function (a, b) { return a.n - b.n; });
       d[col] = [].concat.apply([], parts.map(function (p) { return p.items; }));
     });
-    if (meta) { d.sla = meta.sla; d.costs = meta.costs; d.read = meta.read; d.demo = meta.demo; d.forms = meta.forms; }
+    if (meta) { d.sla = meta.sla; d.costs = meta.costs; d.read = meta.read; d.demo = meta.demo; d.forms = meta.forms; d.retention = meta.retention; }
     state = normalizeState(d); store.mode = 'remote'; store.failed = false;
     store.cache = meta ? chunkDocs() : {};
     render();
@@ -333,7 +334,7 @@ function renderGate() {
       '<p class="text-[11px] leading-relaxed text-slate-500">Las encuentra en Supabase con el botón Connect o en Settings → API Keys. Puede pegar la línea completa tal como la copia: aquí se toma solo la dirección y la clave. Use la clave pública (publishable); nunca la clave "secret" o "service_role".</p><button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('plug') + 'Conectar</button></form>';
     else if (store.mode === 'login') inner = err + '<form id="form-login" class="space-y-4">' + field('Correo', '<input name="email" type="email" required autocomplete="username" value="' + esc(store.lastEmail || '') + '" class="' + INPUT + '">') + field('Clave', '<input name="password" type="password" required autocomplete="current-password" class="' + INPUT + '">') + '<button type="submit" class="' + BTN_PRI + ' w-full !py-2.5">' + ic('log-in') + 'Ingresar</button></form>' + (cfg && !cfg.fixed ? '<button data-action="reset-cfg" class="mt-4 w-full text-center text-xs text-slate-400 hover:text-slate-600">Cambiar el proyecto de Supabase</button>' : '');
     else inner = err + '<div class="flex flex-wrap gap-2"><button data-action="retry" class="' + BTN_PRI + ' flex-1">' + ic('refresh-cw') + 'Reintentar</button>' + (store.sb ? '<button data-action="logout" class="' + BTN_SEC + ' flex-1">Cerrar sesión</button>' : '') + '</div>';
-    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div><span class="tnum ml-auto self-start rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">v1.5</span></div>' + inner + '</div></div>';
+    g.innerHTML = '<div class="flex min-h-full items-center justify-center p-4"><div class="card w-full max-w-md p-7 !shadow-xl"><div class="mb-5 flex items-center gap-3"><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">' + ic('sparkles', 'h-5 w-5') + '</div><div><p class="font-display text-lg font-bold text-slate-900">TalentOS HR</p><p class="text-xs text-slate-500">Control interno de selección, contratación y rotación</p></div><span class="tnum ml-auto self-start rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">v1.6</span></div>' + inner + '</div></div>';
     g.dataset.sig = sig; icons();
   }
   g.hidden = false;
@@ -479,6 +480,7 @@ function allAlerts() {
     if (p.left < 0) list.push({ key: 'v:' + v.id + ':' + v.deadline, level: 'crit', act: 'go-pipeline', id: v.id, icon: 'briefcase', title: v.title, tag: 'Fecha límite vencida', text: 'Debía cerrarse el ' + fmtDate(v.deadline) + ' (hace ' + plural(-p.left, 'día', 'días') + ')' });
     else if (p.left <= 5) list.push({ key: 'v:' + v.id + ':' + v.deadline, level: 'warn', act: 'go-pipeline', id: v.id, icon: 'briefcase', title: v.title, tag: p.left === 0 ? 'Vence hoy' : 'Faltan ' + plural(p.left, 'día', 'días'), text: 'Fecha límite de contratación: ' + fmtDate(v.deadline) });
   });
+  list = list.concat(retAlerts());
   return list.sort(function (a, b) { return (a.level === 'crit' ? 0 : 1) - (b.level === 'crit' ? 0 : 1); });
 }
 function kpis() {
@@ -543,7 +545,7 @@ function toast(msg, kind) {
    ===================================================================== */
 function renderChrome() {
   var risk = hiringAtRisk().length, overdue = bottlenecks().length;
-  var groups = [['Selección', [['dashboard', 'layout-dashboard', 'Dashboard', 0], ['vacantes', 'briefcase', 'Vacantes', 0], ['pipeline', 'kanban-square', 'Pipeline de candidatos', overdue], ['postulaciones', 'inbox', 'Postulaciones', store.forms.posts.length], ['evaluador', 'scan-search', 'Evaluador IA de Perfiles', 0]]],
+  var groups = [['Selección', [['dashboard', 'layout-dashboard', 'Dashboard', 0], ['vacantes', 'briefcase', 'Vacantes', 0], ['pipeline', 'kanban-square', 'Pipeline de candidatos', overdue], ['postulaciones', 'inbox', 'Postulaciones', store.forms.posts.length], ['conservacion', 'shield-check', 'Conservación de datos', retGroups().due.length], ['evaluador', 'scan-search', 'Evaluador IA de Perfiles', 0]]],
     ['Ingreso y permanencia', [['contratacion', 'clipboard-check', 'Seguimiento de Contratación', risk], ['rotacion', 'users', 'Rotación y Retención', 0]]],
     ['Inteligencia', [['copiloto', 'sparkles', 'Copiloto IA', 0]]]];
   $('#nav').innerHTML = groups.map(function (g) {
@@ -570,7 +572,7 @@ function renderChrome() {
 function renderSideFoot() {
   var el = $('#side-foot'); if (!el) return;
   var SB = 'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white';
-  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos. <span class="tnum text-slate-500">v1.5</span></div>' +
+  el.innerHTML = '<div class="mb-2 rounded-lg bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-400"><span class="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-200">' + ic('lock', 'h-3 w-3') + '<span id="save-status">' + saveStatusText() + '</span></span><span class="block truncate" title="' + esc(store.email) + '">' + esc(store.email || 'Sesión no iniciada') + '</span>Datos privados en su base de datos. <span class="tnum text-slate-500">v1.6</span></div>' +
     (store.mode !== 'remote' ? '' : '<button data-action="export" class="' + SB + '">' + ic('download', 'h-3.5 w-3.5') + 'Exportar respaldo</button>' +
       '<label class="' + SB + ' cursor-pointer">' + ic('upload', 'h-3.5 w-3.5') + 'Restaurar respaldo<input id="backup-file" type="file" accept=".json,application/json" class="sr-only"></label>' +
       (isEmpty() ? '<button data-action="load-demo" class="' + SB + '">' + ic('flask-conical', 'h-3.5 w-3.5') + 'Cargar datos de ejemplo</button>' : '<button data-action="wipe" class="' + SB + '">' + ic('trash-2', 'h-3.5 w-3.5') + 'Borrar todos los datos</button>') +
@@ -761,7 +763,7 @@ function openCandidate(id) {
         '<div class="grid gap-3 sm:grid-cols-2">' + field('Email', '<input name="email" type="email" maxlength="90" value="' + esc(c.email) + '" class="' + INPUT + '">') + field('Teléfono', '<input name="phone" maxlength="24" value="' + esc(c.phone) + '" class="' + INPUT + '">') + '</div>' +
         '<div class="grid gap-3 sm:grid-cols-2">' + field('Fuente', '<select name="source" class="' + INPUT + '">' + options(SOURCES.indexOf(c.source) < 0 ? SOURCES.concat([c.source]) : SOURCES, c.source) + '</select>') + field('Vacante', '<select name="vacancyId" class="' + INPUT + '">' + options(state.vacancies.map(function (x) { return [x.id, x.title]; }), c.vacancyId) + '</select>') + '</div>' +
         field('Observaciones', '<textarea name="notes" rows="4" maxlength="900" class="' + INPUT + '">' + esc(c.notes) + '</textarea>') +
-        '<div class="flex flex-wrap items-center gap-2"><button type="submit" class="' + BTN_PRI + '">' + ic('save') + 'Guardar datos</button><button type="button" data-action="del-cand" data-id="' + c.id + '" class="' + BTN + 'text-red-600 hover:bg-red-50">' + ic('trash-2') + 'Eliminar</button></div><p class="text-[11px] text-slate-400">Elimine el registro cuando el candidato solicite retirar sus datos.</p></form>' +
+        '<div class="flex flex-wrap items-center gap-2"><button type="submit" class="' + BTN_PRI + '">' + ic('save') + 'Guardar datos</button><button type="button" data-action="ret-sup" data-id="' + c.id + '" class="' + BTN + 'text-red-600 hover:bg-red-50">' + ic('trash-2') + 'Suprimir datos</button></div>' + retHint(c) + '</form>' +
       '<div class="space-y-5"><div><div class="mb-2 flex items-center justify-between"><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Trazabilidad por etapa</p><button data-action="save-history" data-id="' + c.id + '" class="text-xs font-medium text-indigo-600 hover:underline">Guardar fechas y notas</button></div><ol class="space-y-3">' + history + '</ol></div>' +
         '<div><p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Notas de seguimiento</p><div class="scroll-thin max-h-44 space-y-2 overflow-y-auto">' + notes + '</div><div class="mt-2 flex gap-2"><input id="note-input" maxlength="400" placeholder="Agregar una nota…" aria-label="Nueva nota" class="' + INPUT + '"><button data-action="add-note" data-id="' + c.id + '" class="' + BTN_SEC + '">Agregar</button></div></div></div></div>', true);
 }
@@ -1358,7 +1360,155 @@ document.addEventListener('input', function (e) {
   if (linked[n]) e.target.dataset.filled = '0';
   if ((n === 'responsable' || n === 'titulo' || linked[n]) && av.dataset.auto === '1') av.value = avisoFromForm(f);
 });
-var VIEWS = { dashboard: viewDashboard, vacantes: viewVacantes, pipeline: viewPipeline, postulaciones: viewPostulaciones, evaluador: viewEvaluador, contratacion: viewContratacion, rotacion: viewRotacion, copiloto: viewCopiloto };
+/* =====================================================================
+   CONSERVACIÓN DE DATOS (v1.6)
+   El texto de autorización promete conservar los datos de los candidatos no vinculados hasta por dos años
+   después de terminado el proceso. Este módulo avisa cuándo se cumple el plazo, suprime el registro
+   y deja una constancia sin datos personales.
+   ===================================================================== */
+var RET_YEARS = 2, RET_WARN = 30, RET_LOG_MAX = 3000, RET_LIST_MAX = 50;
+var SUP_REASONS = ['Plazo de conservación cumplido', 'Solicitud del titular', 'Registro duplicado o creado por error'];
+function retState() {
+  if (!state.retention || typeof state.retention !== 'object') state.retention = { log: [] };
+  if (!Array.isArray(state.retention.log)) state.retention.log = [];
+  return state.retention;
+}
+/* Las constancias se conservan al cargar datos de ejemplo, borrar todo o restaurar un respaldo. */
+function retCarry(next) {
+  var cur = retState().log, seen = {};
+  next.retention = next.retention && typeof next.retention === 'object' ? next.retention : {};
+  var log = Array.isArray(next.retention.log) ? next.retention.log : [];
+  log.forEach(function (e) { seen[e.id] = true; });
+  cur.forEach(function (e) { if (!seen[e.id]) log.push(e); });
+  log.sort(function (x, y) { return String(x.at).localeCompare(String(y.at)); });
+  next.retention.log = log.slice(-RET_LOG_MAX);
+  return next;
+}
+function isISODate(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
+function addYears(iso, n) {
+  var p = String(iso || '').split('-').map(Number), y = p[0] + n, m = p[1], d = p[2];
+  if (m === 2 && d === 29 && !((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0)) d = 28;
+  return y + '-' + pad(m) + '-' + pad(d);
+}
+/* Situación de un candidato frente al plazo. Devuelve null si no aplica (proceso en curso o contratado). */
+function retInfo(c) {
+  if (!c) return null;
+  var since = isISODate(c.stageSince) ? c.stageSince : (isISODate(c.createdAt) ? c.createdAt : '');
+  if (!since) return null;
+  if (c.stage === 6) {
+    if (c.outcome === 'Contratado') return null;
+    var due = addYears(since, RET_YEARS), left = daysBetween(today(), due);
+    return { kind: left < 0 ? 'due' : (left <= RET_WARN ? 'soon' : 'ok'), end: since, due: due, left: left };
+  }
+  var v = vacById(c.vacancyId);
+  if (c.stage < 5 && !v) return { kind: 'review', why: 'La vacante ya no existe y el proceso sigue abierto en ' + STAGES[c.stage] + '.' };
+  if (c.stage < 5 && v.status === 'Cerrada') return { kind: 'review', why: 'La vacante está cerrada y el proceso sigue abierto en ' + STAGES[c.stage] + '.' };
+  if (daysBetween(since, today()) > 365 * RET_YEARS) return { kind: 'review', why: 'Sin movimiento en ' + STAGES[c.stage] + ' desde el ' + fmtDate(since) + '.' };
+  return null;
+}
+function retGroups() {
+  var g = { due: [], soon: [], review: [] };
+  (state.candidates || []).forEach(function (c) { var i = retInfo(c); if (i && g[i.kind]) g[i.kind].push({ c: c, i: i }); });
+  g.due.sort(function (a, b) { return a.i.left - b.i.left; });
+  g.soon.sort(function (a, b) { return a.i.left - b.i.left; });
+  return g;
+}
+function retOldPosts() {
+  var limit = dayNum(today()) - 365 * RET_YEARS;
+  return (store.forms && store.forms.posts || []).filter(function (p) { var d = new Date(p.created_at); return !isNaN(d.getTime()) && dayNum(toISO(d)) < limit; });
+}
+function retAlerts() {
+  var n = retGroups().due.length;
+  return n ? [{ key: 'ret:' + n + ':' + today().slice(0, 7), level: 'crit', act: 'nav', view: 'conservacion', icon: 'shield-alert', title: 'Conservación de datos', tag: plural(n, 'registro por suprimir', 'registros por suprimir'), text: 'Cumplieron el plazo de ' + RET_YEARS + ' años desde el cierre de su proceso.' }] : [];
+}
+function retHint(c) {
+  var i = retInfo(c), t = 'Use Suprimir datos cuando el candidato lo solicite o se cumpla el plazo de conservación. Queda una constancia sin datos personales.';
+  if (i && i.kind === 'due') t = 'El plazo de conservación venció el ' + fmtDate(i.due) + '. Corresponde suprimir este registro.';
+  else if (i && (i.kind === 'soon' || i.kind === 'ok')) t = 'Plazo de conservación: hasta el ' + fmtDate(i.due) + ' (' + RET_YEARS + ' años desde el cierre). ' + t;
+  return '<p class="text-[11px] ' + (i && i.kind === 'due' ? 'font-medium text-red-600' : 'text-slate-400') + '">' + esc(t) + '</p>';
+}
+function retRow(x, mode) {
+  var c = x.c, i = x.i, v = vacById(c.vacancyId), detail, right;
+  if (mode === 'review') {
+    detail = i.why;
+    right = '<button data-action="open-cand" data-id="' + c.id + '" class="' + BTN_SEC + ' !py-1.5 text-xs">' + ic('eye', 'h-3.5 w-3.5') + 'Abrir</button>';
+  } else {
+    detail = (c.outcome || 'Cierre') + ' el ' + fmtDate(i.end) + ' · plazo hasta el ' + fmtDate(i.due);
+    right = mode === 'due'
+      ? '<span class="tnum rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 ring-1 ring-red-200">Venció hace ' + plural(-i.left, 'día', 'días') + '</span><button data-action="ret-sup" data-id="' + c.id + '" class="' + BTN + '!py-1.5 bg-red-600 text-xs text-white hover:bg-red-700">' + ic('trash-2', 'h-3.5 w-3.5') + 'Suprimir</button>'
+      : '<span class="tnum rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200">' + (i.left === 0 ? 'Vence hoy' : 'Vence en ' + plural(i.left, 'día', 'días')) + '</span><button data-action="open-cand" data-id="' + c.id + '" class="' + BTN_SEC + ' !py-1.5 text-xs">' + ic('eye', 'h-3.5 w-3.5') + 'Ver</button>';
+  }
+  return '<li class="flex flex-wrap items-center gap-3 px-5 py-3">' + avatar(c.name) + '<div class="min-w-0 flex-1 basis-52"><p class="truncate text-sm font-semibold text-slate-900">' + esc(c.name) + '</p><p class="text-xs text-slate-500">' + esc((v ? v.title : 'Sin vacante') + ' · ' + detail) + '</p></div><div class="flex flex-wrap items-center gap-2">' + right + '</div></li>';
+}
+function retSection(icon, toneCls, title, sub, list, mode, action) {
+  if (!list.length) return '';
+  var more = list.length - RET_LIST_MAX;
+  return '<section class="card mb-6 overflow-hidden"><div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">' + sectionHead(icon, toneCls, title, sub) + (action || '') + '</div><ul class="divide-y divide-slate-100">' +
+    list.slice(0, RET_LIST_MAX).map(function (x) { return retRow(x, mode); }).join('') + '</ul>' + (more > 0 ? '<p class="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">Y ' + plural(more, 'registro más', 'registros más') + '.</p>' : '') + '</section>';
+}
+function viewConservacion() {
+  var g = retGroups(), log = retState().log, old = retOldPosts(), last = log.length ? log[log.length - 1] : null;
+  var out = pageHead('Conservación de datos', 'Control del plazo de ' + RET_YEARS + ' años que el texto de autorización fija para los datos de candidatos no vinculados.', log.length ? '<button data-action="ret-csv" class="' + BTN_SEC + '">' + ic('download') + 'Descargar constancias</button>' : '');
+  out += '<div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">' +
+    kpi('shield-alert', 'bg-red-50 text-red-600', 'Plazo cumplido', g.due.length, g.due.length ? 'Corresponde suprimirlos' : 'Nada por suprimir') +
+    kpi('clock', 'bg-amber-50 text-amber-600', 'Vencen en ' + RET_WARN + ' días', g.soon.length, 'Próximos a cumplir el plazo') +
+    kpi('list-checks', 'bg-indigo-50 text-indigo-600', 'Por revisar', g.review.length, 'Procesos abiertos sin cerrar') +
+    kpi('file-check', 'bg-emerald-50 text-emerald-600', 'Supresiones', log.length, last ? 'Última: ' + fmtDateTime(last.at) : 'Sin supresiones registradas') + '</div>';
+  if (old.length) out += '<div class="card mb-6 flex flex-wrap items-center gap-3 border-amber-200 bg-amber-50/60 px-5 py-4"><span class="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-amber-100 text-amber-700">' + ic('inbox', 'h-[18px] w-[18px]') + '</span><p class="min-w-0 flex-1 basis-60 text-sm text-amber-900">' + plural(old.length, 'registro lleva', 'registros llevan') + ' más de ' + RET_YEARS + ' años en la bandeja de Postulaciones sin aceptarse. Revíselos y descártelos.</p><button data-action="nav" data-view="postulaciones" class="' + BTN_SEC + '">Ir a Postulaciones</button></div>';
+  out += retSection('shield-alert', 'bg-red-50 text-red-600', 'Plazo cumplido', 'Pasaron más de ' + RET_YEARS + ' años desde el cierre de su proceso.', g.due, 'due', '<button data-action="ret-sup-all" class="' + BTN + 'bg-red-600 text-white hover:bg-red-700">' + ic('trash-2') + 'Suprimir ' + (g.due.length === 1 ? 'el registro' : 'los ' + g.due.length) + '</button>');
+  out += retSection('clock', 'bg-amber-50 text-amber-600', 'Próximos a vencer', 'Cumplen el plazo en los próximos ' + RET_WARN + ' días.', g.soon, 'soon');
+  out += retSection('list-checks', 'bg-indigo-50 text-indigo-600', 'Por revisar', 'El plazo empieza a contar cuando el candidato pasa a Cierre. Cierre estos procesos o suprima el registro.', g.review, 'review');
+  if (!g.due.length && !g.soon.length && !g.review.length) out += '<div class="card mb-6 px-6 py-12 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">' + ic('shield-check', 'h-6 w-6') + '</span><p class="mt-4 font-display text-base font-bold text-slate-900">Al día</p><p class="mx-auto mt-1 max-w-md text-sm text-slate-500">Ningún candidato ha cumplido el plazo de conservación ni está próximo a cumplirlo.</p></div>';
+  if (log.length) {
+    var rows = log.slice(-RET_LIST_MAX).reverse().map(function (r) {
+      return '<tr class="border-t border-slate-100"><td class="tnum whitespace-nowrap px-4 py-2.5 text-slate-700">' + esc(fmtDateTime(r.at)) + '</td><td class="px-4 py-2.5 text-slate-700">' + esc(r.reason) + (r.reqDate ? '<span class="block text-[11px] text-slate-400">Solicitud del ' + esc(fmtDate(r.reqDate)) + '</span>' : '') + '</td><td class="px-4 py-2.5 text-slate-700">' + esc(r.vacancy) + '</td><td class="px-4 py-2.5 text-slate-500">' + esc(r.outcome) + '</td><td class="tnum whitespace-nowrap px-4 py-2.5 text-slate-500">' + esc(fmtDate(r.createdAt)) + '</td><td class="tnum whitespace-nowrap px-4 py-2.5 text-slate-500">' + esc(fmtDate(r.closedAt)) + '</td></tr>';
+    }).join('');
+    out += '<section class="card mb-6 overflow-hidden"><div class="border-b border-slate-100 px-5 py-4">' + sectionHead('file-check', 'bg-emerald-50 text-emerald-600', 'Constancias de supresión', 'Fecha, motivo y datos del proceso. No guardan nombre, celular ni correo.' + (log.length > RET_LIST_MAX ? ' Se muestran las ' + RET_LIST_MAX + ' más recientes de ' + log.length + '.' : '')) + '</div><div class="overflow-x-auto"><table class="w-full min-w-[720px] text-left text-sm"><thead><tr class="text-[11px] uppercase tracking-wide text-slate-400"><th class="px-4 py-2.5 font-semibold">Suprimido</th><th class="px-4 py-2.5 font-semibold">Motivo</th><th class="px-4 py-2.5 font-semibold">Vacante</th><th class="px-4 py-2.5 font-semibold">Resultado</th><th class="px-4 py-2.5 font-semibold">Registro</th><th class="px-4 py-2.5 font-semibold">Cierre</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+  }
+  out += '<div class="card px-5 py-4"><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cómo funciona este control</p><ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600"><li>El plazo cuenta desde la fecha en que el candidato pasó a Cierre como No seleccionado o Desistió.</li><li>Los candidatos contratados no entran aquí: sus datos pasan a la plantilla de colaboradores.</li><li>Suprimir borra el registro completo del candidato: contacto, observaciones, historial y notas. No se puede deshacer.</li><li>Los respaldos exportados antes de una supresión todavía contienen esos datos. Elimine los archivos antiguos y exporte uno nuevo.</li></ul></div>';
+  return out;
+}
+function openSuppress(id) {
+  var c = candById(id); if (!c) return;
+  var i = retInfo(c), v = vacById(c.vacancyId), hired = c.stage === 6 && c.outcome === 'Contratado';
+  openModal(modalHead('Suprimir datos del candidato', c.name + (v ? ' · ' + v.title : '')) +
+    '<form id="form-sup" data-id="' + c.id + '"><div class="space-y-4 px-6 py-5"><p class="text-sm text-slate-600">Se borrará de forma definitiva el registro completo: datos de contacto, observaciones, historial por etapa y notas. Quedará una constancia con la fecha y el motivo, sin datos personales.</p>' +
+    (hired ? '<p class="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">Este candidato fue contratado. Su registro en la plantilla de colaboradores no cambia.</p>' : '') +
+    '<div class="grid gap-3 sm:grid-cols-2">' + field('Motivo', '<select name="reason" required class="' + INPUT + '">' + options(SUP_REASONS, i && i.kind === 'due' ? SUP_REASONS[0] : SUP_REASONS[1]) + '</select>') +
+    field('Fecha de la solicitud (si aplica)', '<input type="date" name="reqDate" max="' + today() + '" class="' + INPUT + '">') + '</div></div>' +
+    modalFoot('<button type="button" data-action="close-modal" class="' + BTN_SEC + '">Cancelar</button><button type="submit" class="' + BTN + 'bg-red-600 text-white hover:bg-red-700">' + ic('trash-2') + 'Suprimir datos</button>') + '</form>');
+}
+function confirmSuppressAll() {
+  var n = retGroups().due.length; if (!n) return;
+  confirmModal('Suprimir registros con plazo cumplido', (n === 1 ? 'Se borrará de forma definitiva 1 candidato cuyo plazo de conservación ya se cumplió, con su historial y notas. Quedará una constancia sin datos personales.' : 'Se borrarán de forma definitiva ' + n + ' candidatos cuyo plazo de conservación ya se cumplió, con su historial y notas. Quedará una constancia por cada uno, sin datos personales.') + ' Esta acción no se puede deshacer.', n === 1 ? 'Suprimir' : 'Suprimir los ' + n, 'ret-sup-all-yes');
+}
+function suppress(ids, reason, reqDate) {
+  var R = retState(), now = new Date().toISOString(), done = {}, n = 0;
+  if (SUP_REASONS.indexOf(reason) < 0) reason = SUP_REASONS[1];
+  ids.forEach(function (id) {
+    var c = candById(id); if (!c || done[id]) return;
+    var v = vacById(c.vacancyId);
+    R.log.push({ id: uid('s'), at: now, reason: reason, reqDate: isISODate(reqDate) ? reqDate : '', vacancy: v ? v.title : 'Sin vacante', outcome: c.stage === 6 ? (c.outcome || 'Cierre') : 'En proceso · ' + STAGES[c.stage], source: c.source || '', createdAt: isISODate(c.createdAt) ? c.createdAt : '', closedAt: c.stage === 6 && isISODate(c.stageSince) ? c.stageSince : '', version: (c.consentInfo && c.consentInfo.version) || '' });
+    done[id] = true; n++;
+  });
+  if (!n) { closeModal(); return; }
+  state.candidates = state.candidates.filter(function (x) { return !done[x.id]; });
+  if (R.log.length > RET_LOG_MAX) R.log = R.log.slice(-RET_LOG_MAX);
+  save(); closeModal(); render();
+  toast(n === 1 ? 'Registro suprimido. Quedó la constancia en Conservación de datos.' : n + ' registros suprimidos. Quedaron las constancias en Conservación de datos.', 'ok');
+}
+function retCsv() {
+  var log = retState().log; if (!log.length) return;
+  var cell = function (v) { v = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
+  var lines = [['Suprimido', 'Motivo', 'Fecha de la solicitud', 'Vacante', 'Resultado del proceso', 'Fuente', 'Fecha de registro', 'Fecha de cierre', 'Texto de autorización'].map(cell).join(';')].concat(log.map(function (r) {
+    return [fmtDateTime(r.at), r.reason, r.reqDate, r.vacancy, r.outcome, r.source, r.createdAt, r.closedAt, r.version].map(cell).join(';');
+  }));
+  var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), link = document.createElement('a');
+  link.href = URL.createObjectURL(blob); link.download = 'talentos-hr-constancias-supresion-' + today() + '.csv';
+  document.body.appendChild(link); link.click(); link.remove(); setTimeout(function () { URL.revokeObjectURL(link.href); }, 2000);
+  toast('Constancias descargadas.', 'ok');
+}
+var VIEWS = { dashboard: viewDashboard, vacantes: viewVacantes, pipeline: viewPipeline, postulaciones: viewPostulaciones, conservacion: viewConservacion, evaluador: viewEvaluador, contratacion: viewContratacion, rotacion: viewRotacion, copiloto: viewCopiloto };
 var pendingId = null, pendingBackup = null;
 
 document.addEventListener('click', function (e) {
@@ -1380,14 +1530,14 @@ document.addEventListener('click', function (e) {
     case 'notif-read': state.read = allAlerts().map(function (x) { return x.key; }); save(); renderChrome(); icons(); break;
     case 'toggle-filter': ui.filters[b.dataset.filter] = !ui.filters[b.dataset.filter]; if (b.dataset.filter === 'unscored' && ui.filters.unscored) ui.filters.high = false; if (b.dataset.filter === 'high' && ui.filters.high) ui.filters.unscored = false; ui.view = 'pipeline'; render(); break;
     case 'clear-filters': ui.filters = { overdue: false, high: false, unscored: false }; render(); break;
-    case 'load-demo': if (!isEmpty()) break; state = seed(); save(); ui.pipeVac = ''; ui.ev = freshEv(); ui.cop = freshCop(); closeModal(); render(); toast('Datos de ejemplo cargados. Bórrelos antes de registrar información real.', 'ok'); break;
+    case 'load-demo': if (!isEmpty()) break; state = retCarry(seed()); save(); ui.pipeVac = ''; ui.ev = freshEv(); ui.cop = freshCop(); closeModal(); render(); toast('Datos de ejemplo cargados. Bórrelos antes de registrar información real.', 'ok'); break;
     case 'wipe': confirmModal('Borrar todos los datos', 'Se eliminarán de forma definitiva las ' + state.vacancies.length + ' vacantes, ' + state.candidates.length + ' candidatos y ' + state.employees.length + ' colaboradores. Exporte un respaldo antes si los necesita.', 'Borrar todo', 'wipe-yes'); break;
-    case 'wipe-yes': state = emptyState(); save(); ui.pipeVac = ''; ui.ev = freshEv(); ui.cop = freshCop(); closeModal(); ui.view = 'dashboard'; render(); toast('Datos eliminados. El sistema quedó vacío.', 'ok'); break;
+    case 'wipe-yes': state = retCarry(emptyState()); save(); ui.pipeVac = ''; ui.ev = freshEv(); ui.cop = freshCop(); closeModal(); ui.view = 'dashboard'; render(); toast('Datos eliminados. El sistema quedó vacío.', 'ok'); break;
     case 'export': (function () { var blob = new Blob([JSON.stringify({ app: 'TalentOS HR', exportedAt: today(), state: state }, null, 1)], { type: 'application/json' }), link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'talentos-hr-respaldo-' + today() + '.json'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(function () { URL.revokeObjectURL(link.href); }, 3000); toast('Respaldo descargado. Guárdelo en un lugar seguro: contiene datos personales.', 'ok'); })(); break;
     case 'logout': closeModal(); closeSidebar(); (store.sb ? store.sb.auth.signOut() : Promise.resolve()).catch(function () {}).then(function () { state = emptyState(); store.cache = {}; store.forms = freshForms(); store.uid = null; store.email = ''; store.authError = ''; store.mode = 'login'; ui.view = 'dashboard'; render(); }); break;
     case 'retry': boot(); break;
     case 'reset-cfg': try { localStorage.removeItem(CFG_KEY); } catch (err2) { /* sin almacenamiento */ } store.sb = null; store.authError = ''; store.mode = 'setup'; render(); break;
-    case 'backup-yes': if (pendingBackup) { state = normalizeState(pendingBackup); pendingBackup = null; save(); closeModal(); render(); toast('Respaldo restaurado.', 'ok'); } break;
+    case 'backup-yes': if (pendingBackup) { state = retCarry(normalizeState(pendingBackup)); pendingBackup = null; save(); closeModal(); render(); toast('Respaldo restaurado.' + (retState().log.length ? ' Si es anterior a una supresión, esos registros volvieron: revise Conservación de datos.' : ''), 'ok'); } break;
     case 'new-emp': openEmployeeModal(); break;
     case 'import-emp': closeSidebar(); openImportModal(); break;
     case 'close-modal': closeModal(); break;
@@ -1419,8 +1569,10 @@ document.addEventListener('click', function (e) {
       if (dayNum(dates[dates.length - 1]) > dayNum(today())) { toast('La fecha de la etapa actual no puede ser futura.', 'warn'); return; }
       c.history.forEach(function (h, i) { h.date = dates[i]; h.note = $('[data-hnote="' + i + '"]').value.trim(); });
       c.createdAt = dates[0]; c.stageSince = dates[dates.length - 1]; save(); render(); openCandidate(id); toast('Trazabilidad actualizada. Las alertas se recalcularon.', 'ok'); break;
-    case 'del-cand': pendingId = id; c = candById(id); confirmModal('Eliminar candidato', 'Se eliminará el registro de ' + (c ? c.name : 'este candidato') + ' con su historial y notas. Esta acción no se puede deshacer.', 'Eliminar', 'del-yes'); break;
-    case 'del-yes': state.candidates = state.candidates.filter(function (x) { return x.id !== pendingId; }); pendingId = null; save(); closeModal(); render(); toast('Registro eliminado.', 'ok'); break;
+    case 'ret-sup': openSuppress(id); break;
+    case 'ret-sup-all': confirmSuppressAll(); break;
+    case 'ret-sup-all-yes': suppress(retGroups().due.map(function (x) { return x.c.id; }), SUP_REASONS[0], ''); break;
+    case 'ret-csv': retCsv(); break;
     case 'toggle-step':
       c = candById(id); if (!c || !c.hiring) break;
       var st = c.hiring.steps[Number(b.dataset.step)]; st.done = !st.done; st.date = st.done ? today() : ''; save(); render();
@@ -1445,6 +1597,7 @@ document.addEventListener('submit', function (e) {
   var f = e.target, d = {}; new FormData(f).forEach(function (v, k) { d[k] = typeof v === 'string' ? v.trim() : v; });
   var t = today(), c, v;
   if (f.id === 'form-conv') { submitConv(f, d); return; }
+  if (f.id === 'form-sup') { suppress([f.dataset.id], d.reason, d.reqDate); return; }
   if (f.id === 'form-setup') {
     var pc = parseConn(d.url, d.key), url = pc.url, key = pc.key;
     if (pc.secret) { store.authError = 'Esa es una clave secreta. Use la clave pública (publishable).'; render(); return; }
